@@ -36,6 +36,7 @@ void loop() {
 
 void setupWifi(){
   wifiMulti.addAP("Azaviu 2.4GHz", "sebastian");
+  wifiMulti.addAP("Azaviu", "sebastian");
 
   Serial.print("Connecting");
 
