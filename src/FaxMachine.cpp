@@ -1,17 +1,20 @@
 #include "Arduino.h" //Arduino Library
-#include "ESP8266WiFi.h" //WiFi Library
 #include "ArduinoOTA.h" //Over-The-Air Update Library
 #include "twilio.h" //Twilio Library
 #include "Adafruit_Thermal.h" //Thermal Printer Library
 #include "NTPClock.h" //NTP Library
 #include "ESP8266WebServer.h" //Web Server Library
 #include "ESP8266mDNS.h" //multicast DNS Library
-#include "Counter.h" //Counter Library
+#include "WiFiManager.h"
+#include "WiFiClient.h"
+#include "WebInterface.h"
 
-NTPClock ntpClock((char*)("time.google.com"), -7); //Create an NTP object with a -7 hour offset
+NTPClock ntpClock((char*)("time.google.com"), -8); //Create an NTP object with a -7 hour offset
 Twilio *twilio; //Create a twilio object
 ESP8266WebServer twilio_server(8000); //Create a web server for Twilio API Communication
 Adafruit_Thermal printer(&Serial); //Create a Thermal Printer object
+WiFiManager wifiManager(10000);
+WebInterface webInterface;
 
 const char fingerprint[] = "06 86 86 C0 A0 ED 02 20 7A 55 CC F0 75 BB CF 24 B1 D9 C0 49"; //Twilio fingerprint to authenticate connection
 const char* account_sid = "AC6e91a7c91c69b11d1d621f9f09ce0858"; //Twilio SID
@@ -20,11 +23,7 @@ const char* auth_token = "9cc8633f6e84411fd69e2a17b3e82258"; //Twilio Authentica
 const char* deviceName = "faxmachine"; //Device Name
 const char* devicePassword = "sebastian"; //Device Password
 
-uint8_t statusWiFi = 0; //0=not connected, 1=connected to network, 2=hotspot mode
-bool statusTwilio = false; //Are we connected to Twilio?
-
-const char* wifiNetwork = "Azaviu 2.4GHz"; //WiFi Network Name
-const char* wifiPassword = "sebastian"; //WiFi Network Password
+bool statusTwilio = false;
 
 //Wrap text to a specified amount of characters
 String wrapText(String input, uint8_t wrapLength){
@@ -142,9 +141,6 @@ void printTimestamp(uint8_t feed, bool longDate){
     if(feed != 0) printer.feed(feed); 
     printer.setDefault();
     printer.sleep();
-  }else{
-    //print an error message if we don't have a time yet
-    printError("Unable to Connect To Time Server!", feed);
   }
 }
 
@@ -159,60 +155,22 @@ void printLine(uint8_t feed){
   printer.sleep();
 }
 
+
 //Test the Connection to Twilio
 bool testTwilio(){
-  IPAddress twilioIP;
-  if(WiFi.hostByName("api.twilio.com", twilioIP) == 1){ //If we can resolve Twilio's IP Address, return true
+  WiFiClient client;
+  if(client.connect("api.twilio.com", 443)){ //If we can resolve Twilio's IP Address, return true
     statusTwilio = true;
+    if(ntpClock.begin(1000)){
+      printTimestamp(1, true);
+    }else{
+      printError("Unable to Connect To Time Server!", 1);
+    }
+    printHeading("Ready to Receive Messages!",0);
+    printHeading("(604) 373 - 9569",4);
     return true;
   } //Otherwise, return false
   statusTwilio = false;
-  return false;
-}
-
-//Scan for known wifi networks
-bool scanWiFi(){
-  uint8_t networksFound = WiFi.scanNetworks();
-
-  for(int i=0; i<networksFound; i++){
-    if(WiFi.SSID(i) == wifiNetwork){
-      return true;
-    }
-  }
-  return false;
-}
-
-//Connect to the WiFi network. Returns true if connection can be made within the specified timeout.
-bool connectWiFi(uint32_t timeout){
-  statusWiFi = 0; //Reset the WiFI Status
-  WiFi.mode(WIFI_STA); //Enter Station Mode
-  WiFi.begin(wifiNetwork, wifiPassword); //Start the WiFi connection
-
-  Counter counter(timeout);
-  while(!counter.status()){ //While within timeout periud
-    yield();
-    if(WiFi.status() == WL_CONNECTED){ //If we're connected
-      statusWiFi = 1; //Change the WiFi Status
-      return true; // Return true
-    }
-  }
-  return false; //If we're not connected by the timeout, return false
-}
-
-//Create a Hotspot
-bool createAP(){
-  statusWiFi = 0; //Reset the WiFi Status
-  WiFi.mode(WIFI_AP); //Enter Access point mode
-  if(WiFi.softAP(deviceName, devicePassword)){ //Start the access point
-    printStatus("Hotspot Started! ", 0); //Output our status
-    printStatus("Network: " + String(deviceName), 0);
-    printStatus("Password: " + String(devicePassword), 1);
-    printHeading("<-- Hold Button to Reconnect To WiFi", 3);
-    statusWiFi = 2;
-    return true;
-  }
-  printError("Unable to Initialize Hotspot!", 0); //Output an error if we can't create the hotspot (not sure when this would ever happen)
-  printHeading("<-- Hold Button to Retry", 3);
   return false;
 }
 
@@ -243,6 +201,39 @@ void receiveMessage(){ //This function processes incoming SMS messages
   printLine(4);
 } 
 
+void setIdle(){
+  printStatus("Searching for Networks...", 1);
+  printHeading("<-- Press Button to Start Hotspot", 3);
+  wifiManager.setIdle();
+}
+
+void createHotspot(){
+  if(wifiManager.createHotspot(deviceName, devicePassword)){
+    printStatus("Hotspot Started! ", 0); //Output our status
+    printStatus("Network: " + String(deviceName), 0);
+    printStatus("Password: " + String(devicePassword), 1);
+    printHeading("<-- Press Button to Stop Hotspot", 3);
+  }else{
+    printError("Unable to Initialize Hotspot!", 0); //Output an error if we can't create the hotspot (not sure when this would ever happen)
+    printHeading("<-- Press Button to Retry", 3);
+  }
+}
+
+void connected(){
+  printStatus("WiFi Connected: " + wifiManager.SSID(), 0); //Print the network
+
+  if(!testTwilio()){ //If we establish a connection to Twilio, print out a message
+    if(ntpClock.begin(1000)){
+      printTimestamp(1, true);
+    }else{
+      printError("Unable to Connect To Time Server!", 1);
+    }
+    printError("Unable to Connect To Message Server, Check Internet Connection!", 3);
+  }
+
+  wifiManager.setConnected();
+}
+
 //#######################
 //######## SETUP ########
 //#######################
@@ -260,7 +251,7 @@ void setup() {
   ArduinoOTA.begin();
 
   //Create a twilio object
-  twilio = new Twilio(account_sid, auth_token, fingerprint);
+  //twilio = new Twilio(account_sid, auth_token, fingerprint);
 
   //Create a web server for comunicating with Twilio. Call the function receiveMessage when anything is received at /message
   twilio_server.on("/message", receiveMessage);
@@ -275,23 +266,13 @@ void setup() {
   //Print the title
   printTitle("FAX MACHINE", 1);
 
-  //Attempt to connect to WiFi
-  if(connectWiFi(10000)){ //If we connect within 10 seconds
-    printStatus("WiFi Connected: " + WiFi.SSID(), 0); //Print the network
-    ntpClock.begin(1000); //Initialize the NTP Clock
-    printTimestamp(1, true); //Print a Time Stamp
-    if(testTwilio()){ //Test the twilio connection
-      printHeading("Ready to Receive Messages!",0);
-      printHeading("(604) 373 - 9569",4);
-    }else{
-      printError("Unable to Connect To Message Server, Check Internet Connection!", 3);
-    }
-  }else{ //If Timeout passes and we're not connected, print an error
-    printError("Unable to Connect To WiFi!", 0);  
+  wifiManager.addNetwork("Azaviu 2.4GHz", "sebastian");
+  
+  if(!wifiManager.begin()){
+    printError("Unable to Find Known Networks!", 0);  
     printStatus("Searching for Networks...", 1);
-    printHeading("<-- Hold Button to Start Hotspot", 3);
+    printHeading("<-- Press Button to Start Hotspot", 3);
   }
-
 }
 
 //######################
@@ -299,74 +280,56 @@ void setup() {
 //######################
 
 void loop() {
-  MDNS.update(); //Run mDNS
-  ArduinoOTA.handle(); //Run OTA updater service
 
-  if(WiFi.status() == WL_DISCONNECTED && statusWiFi == 1){ //If we lose connection to the WiFi
-    statusWiFi = 0; //Change the WiFi status
-    statusTwilio = 0; //Change the Twilio status
-    printTimestamp(0, false); //Print the time and an error
-    printError("Lost WiFi Connection!", 0);
-    printStatus("Searching for Networks...", 1);
-    printHeading("<-- Hold Button to Start Hotspot", 3);
-  }
+  switch(wifiManager.handle()){
 
-  if(statusWiFi == 0){ //If we have no connection
-    if(!digitalRead(D1)){ //If the button is pressed, create an access point
-      createAP();
-    }else if(scanWiFi()){ //If we find a known network, attempt to connect to it
-      if(connectWiFi(10000)){ //If we connect within 10 seconds...
-        printStatus("WiFi Connected: " + WiFi.SSID(), 0); //Print the network
-        ntpClock.begin(1000); //Initialize the NTP Clock
-        printTimestamp(1, true); //Print a Time Stamp
-        if(testTwilio()){ //Test the twilio connection
-          printHeading("Ready to Receive Messages!",0);
-          printHeading("(604) 373 - 9569",4);
-        }else{
-          printError("Unable to Connect To Message Server, Check Internet Connection!", 3);
-        }
-      }else{ //If we don't connect within 10 seconds, print some errors
-        printError("Unable to Connect To WiFi!", 0);  
-        printStatus("Searching for Networks...", 1);
-        printHeading("<-- Hold Button to Start Hotspot", 3);
-      }
-    }
+    case WM_IDLE: 
+        if(!digitalRead(D1)) createHotspot(); //If the button is pressed, create an access point
+        break;
 
-  }else if(statusWiFi == 1 ){ //If we're connected to WiFi...
-    twilio_server.handleClient(); //Update the Twilio server
-    ntpClock.handle(); //Update the clock
+    case WM_SCANNING: 
+        if(!digitalRead(D1)) createHotspot(); //If the button is pressed, create an access point
+        break;
     
-    if(!statusTwilio){ //If we don't have a connection to Twilio, test it
-      if(testTwilio()){ //If we establish a connection to Twilio, print out a message
-        ntpClock.begin(1000);
-        printTimestamp(1, true);
-        printHeading("Ready to Receive Messages!",0);
-        printHeading("(604) 373 - 9569",4);
-      }
-    }
+    case WM_SCAN_FAILED: break;
+    case WM_CONNECTING: break;
+          
+    case WM_CONNECTION_SUCCESS:
+        connected();
+        break;
 
-  }else if(statusWiFi == 2){ //If a hotspot has been set up
-    if(!digitalRead(D1)){ //If a button is being held down for over a second
-      delay(1000);
-      if(!digitalRead(D1)){
-        printStatus("Connecting to WiFi...", 2); //Connect to the WiFi
-        if(connectWiFi(10000)){ //If we connect within 10 seconds...
-          printStatus("WiFi Connected: " + WiFi.SSID(), 0); //Print the network
-          ntpClock.begin(1000); //Initialize the NTP Clock
-          printTimestamp(1, true); //Print a Time Stamp
-          if(testTwilio()){ //Test the twilio connection
-            printHeading("Ready to Receive Messages!",0);
-            printHeading("(604) 373 - 9569",4);
-          }else{
-            printError("Unable to Connect To Message Server, Check Internet Connection!", 3);
-          }
-        }else{ //If we don't connect within 10 seconds, print some errors
-          printError("Unable to Connect To WiFi!", 0);  
-          printStatus("Searching for Networks...", 1);
-          printHeading("<-- Hold Button to Start Hotspot", 3);
-        }
-      }
-    }
+    case WM_CONNECTION_FAILED:
+        printError("Unable to Connect To Network!", 0);  
+        setIdle();
+        break;
+
+    case WM_CONNECTED:
+        twilio_server.handleClient(); //Update the Twilio server
+        ntpClock.handle(); //Update the clock
+        webInterface.handle();
+        MDNS.update(); //Run mDNS
+        ArduinoOTA.handle(); //Run OTA updater service
+    
+        if(!statusTwilio) testTwilio(); //If we don't have a connection to Twilio, test it
+        break;
+
+    case WM_CONNECTION_LOST:
+        statusTwilio = false; //Change the Twilio status
+        printTimestamp(0, true); //Print the time and an error
+        printError("Lost WiFi Connection!", 0);
+        setIdle();
+        break;
+
+    case WM_HOTSPOT:
+        webInterface.handle();
+        MDNS.update(); //Run mDNS
+        ArduinoOTA.handle(); //Run OTA updater service
+        
+        if(!digitalRead(D1)) setIdle();
+        break;
   }
 }
 
+    
+
+ 

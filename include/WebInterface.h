@@ -3,6 +3,8 @@
 class WebInterface{
     public:
     
+    WebInterface();
+    
     void setup();
     void handle();
 

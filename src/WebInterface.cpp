@@ -34,10 +34,10 @@ bool handleFileRead(String path){  //This function returns the requested file fr
   return false;                                         
 }
 
-void WebInterface::setup(){
+WebInterface::WebInterface(){
 
     server.onNotFound([](){
-        if(!handleFileRead(server.uri()))
+        if(!handleFileRead("/www" + server.uri()))
         server.send(404, "text/plain", "404: Not Found");
     });
 
