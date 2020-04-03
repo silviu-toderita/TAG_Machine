@@ -335,11 +335,27 @@ void checkMessages(){
   String from;
   String message;
   String id;
-  String mediaResource;
+  String media;
+
+  String response = twilio.check_for_messages(100);
 
   //If there is a new message...
-  if(twilio.check_for_messages(dateTime, from, message, id, mediaResource)){
-    processMessage(dateTime, from.substring(1), message, id, mediaResource);
+  while(response.indexOf("</Message>") != -1){
+
+    message = response.substring(response.indexOf("<Body>") + 6, response.indexOf("</Body>"));
+    from = response.substring(response.indexOf("<From>") + 7, response.indexOf("</From>"));
+    dateTime = response.substring(response.indexOf("<DateSent>") + 10, response.indexOf("</DateSent>") - 6);
+    id = response.substring(response.indexOf("<Sid>") + 5, response.indexOf("</Sid>"));
+    if(response.substring(response.indexOf("<NumMedia>") + 10, response.indexOf("</NumMedia>")).toInt() > 0){
+            media = response.substring(response.indexOf("<Media>") + 7, response.indexOf("</Media>"));
+    }else{
+            media = "";
+    }
+
+    processMessage(dateTime, from, message, id, media);
+    
+    response = response.substring(response.indexOf("</Message>") + 10);
+    
   }
     
 

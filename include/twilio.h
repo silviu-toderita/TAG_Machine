@@ -29,12 +29,9 @@ public:
                 const String& messageID
         );
 
-        bool check_for_messages(
-                String& dateTime,
-                String& from, 
-                String& message, 
-                String& id,
-                String& media
+
+        String check_for_messages(
+                uint16_t maxMessages
         );
 
         bool get_image(

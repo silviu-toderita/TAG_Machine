@@ -1,5 +1,6 @@
 #include "twilio.h"
 
+
 const char* host = "api.twilio.com";
 const int   httpsPort = 443;
 char* account_sid;
@@ -12,6 +13,7 @@ Twilio::Twilio(const char* account_sid_in, const char* auth_token_in, const char
         auth_header = _get_auth_header(account_sid, auth_token_in);
 }
 
+//Test Twilio connection
 bool Twilio::connect(){
         // Use WiFiClient class to create connection
         WiFiClient client;
@@ -24,6 +26,7 @@ bool Twilio::connect(){
         return true;
 }
 
+//Send a message
 bool Twilio::send_message(
         const String& to,
         const String& from,
@@ -74,6 +77,7 @@ bool Twilio::send_message(
         
 }
 
+//Delete a message
 bool Twilio::delete_message(const String& messageID)
 {
         // Use WiFiClientSecure class to create TLS 1.2 connection
@@ -105,7 +109,10 @@ bool Twilio::delete_message(const String& messageID)
         return true;
 }
 
-bool Twilio::check_for_messages(String& dateTime, String& from, String& message, String& id, String& media)
+
+
+//Check for messages
+String Twilio::check_for_messages(uint16_t maxMessages)
 {
         // Use WiFiClientSecure class to create TLS 1.2 connection
         WiFiClientSecure client;
@@ -113,20 +120,21 @@ bool Twilio::check_for_messages(String& dateTime, String& from, String& message,
         client.setTimeout(1000);
         
         // Connect to Twilio's REST API
-        if (!client.connect(host, httpsPort)) return false;
+        if (!client.connect(host, httpsPort)) return "";
         // Check the SHA1 Fingerprint (We will watch for CA verification)
-        if (!client.verify(fingerprint.c_str(), host)) return false; 
+        if (!client.verify(fingerprint.c_str(), host)) return ""; 
 
         // Construct headers and post body manually
-        String http_request = "GET /2010-04-01/Accounts/" +
-                              String(account_sid) + "/Messages?To=%2B16043739569&PageSize=1 HTTP/1.1\r\n" +
-                              auth_header + "\r\n" + "Host: " + host + "\r\n" +
+        String http_request = "GET /2010-04-01/Accounts/" + String(account_sid) + "/Messages?To=%2B16043739569&PageSize=" + String(maxMessages) + " HTTP/1.1\r\n" +
+                              auth_header + "\r\n" + 
+                              "Host: " + host + "\r\n" +
                               "Cache-control: no-cache\r\n" +
                               "User-Agent: Fax Machine\r\n" +
                               "Content-Type: " +
                               "application/x-www-form-urlencoded\r\n" +
                               "Connection: close\r\n" +
-                              "\r\n" + "\r\n";
+                              "\r\n" + 
+                              "\r\n";
 
         client.println(http_request);
 
@@ -135,29 +143,16 @@ bool Twilio::check_for_messages(String& dateTime, String& from, String& message,
                 if(client.available()){
                         response += client.readStringUntil('>') + ">";
                         if(response.indexOf("</Messages>") != -1){
-                                break;
+                                return response;
                         }
                 }
                 yield();
         }
 
-        
+        return "";
 
-        if(response.indexOf("</Messages>") == -1){
-                return false;
-        }
 
-        message = response.substring(response.indexOf("<Body>") + 6, response.indexOf("</Body>"));
-        from = response.substring(response.indexOf("<From>") + 6, response.indexOf("</From>"));
-        dateTime = response.substring(response.indexOf("<DateSent>") + 10, response.indexOf("</DateSent>") - 6);
-        id = response.substring(response.indexOf("<Sid>") + 5, response.indexOf("</Sid>"));
-        if(response.substring(response.indexOf("<NumMedia>") + 10, response.indexOf("</NumMedia>")).toInt() > 0){
-                media = response.substring(response.indexOf("<Media>") + 7, response.indexOf("</Media>"));
-        }else{
-                media = "";
-        }
 
-        return true;
         
 }
 
