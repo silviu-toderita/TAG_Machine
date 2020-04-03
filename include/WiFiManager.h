@@ -14,7 +14,7 @@ class WiFiManager{
     public:
 
     WiFiManager(uint32_t);
-
+    
     bool begin();
     bool createHotspot(const char*, const char*);
     wm_status_t handle();

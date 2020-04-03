@@ -7,17 +7,20 @@ class NTPClock{
     bool handle();
     bool begin(uint32_t);
 
-    uint16_t getYear();
-    uint8_t getMonth();
-    uint8_t getSecond();
-    String getMinute();
-    uint8_t getHour();
+    uint32_t getUNIXTimeExt();
+    String getYear();
+    String getMonth(bool);
+    String getTextMonth(bool);
+    String getDayOfMonth(bool);
+    String getDayOfWeek(bool);
+    String getHour(bool, bool);
     String getAMPM();
-    uint8_t getDayOfMonth();
-    String getDayOfWeek();
-    String getStringMonth();
-    String getLongDate();
-    String getShortDate();
-    String getTime();
+    String getMinute(bool);
+    String getSecond(bool);
+
+    String getDateTime();
+    String getTimestamp();
+
+    String convertDateTime(String);
 
 };

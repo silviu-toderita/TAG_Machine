@@ -1,4 +1,4 @@
-#include "ESP8266WebServer.h" //Web Server Library
+
 
 class WebInterface{
     public:
@@ -7,5 +7,6 @@ class WebInterface{
     
     void setup();
     void handle();
+    void println(String);
 
 };
