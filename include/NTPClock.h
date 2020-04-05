@@ -21,6 +21,7 @@ class NTPClock{
     String getDateTime();
     String getTimestamp();
 
+    String convertUnixTime(uint32_t);
     String convertDateTime(String);
 
 };

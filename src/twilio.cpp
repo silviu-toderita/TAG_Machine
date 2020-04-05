@@ -149,7 +149,7 @@ String Twilio::check_for_messages(uint16_t maxMessages)
                 yield();
         }
 
-        return "";
+        return response;
 
 
 

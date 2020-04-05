@@ -12,7 +12,6 @@
 #include "storage.h" //Silviu's local storage library
 #include "Counter.h" //Silviu's Counter Library
 #include "PubSubClient.h" //MQTT Client Library
-
 #include "ESP8266HTTPClient.h" //For Downloading JPGs...
 #include "TJpg_Decoder.h" //For Decoding JPGs...
 
@@ -31,10 +30,9 @@ Twilio twilio("AC6e91a7c91c69b11d1d621f9f09ce0858", "9cc8633f6e84411fd69e2a17b3e
 const char* deviceName = "faxmachine"; //Device Name
 const char* devicePassword = "sebastian"; //Device Password
 
-bool statusTwilio = false; //Have we been able to connect to Twilio this session?
 bool updated = false; //Did the device just do an OTA update?
 
-uint64_t lastTwilioCheck = 0; //Timestamp that we last checked Twilio
+String lastMessageID;
 
 //Wrap text to a specified amount of characters
 String wrapText(String input, uint8_t wrapLength){
@@ -238,12 +236,10 @@ void downloadImage(String URL){
   http.end();
 }
 
-void processMessage(String dateTime, String from, String message, String id, String mediaResource){
+void processMessage(String time, String from, String message, String id, String media){
 
   if(message == "$help"){
     twilio.send_message(from, "+16043739569", "This fax machine is operated by Silviu. For any issues, contact silviu.toderita@gmail.com.\n##FEATURES\nText: Supported\nEmojis: Not Supported\nPhotos: Coming Soon\nVideos: Not Supported\n##COMMANDS\n$help - Information\n$name - Change Your Name");
-
-    twilio.delete_message(id);
     return;
   }
 
@@ -252,8 +248,6 @@ void processMessage(String dateTime, String from, String message, String id, Str
       //Store the timestamp when we requested a name from the sender
       phoneBook.put(from, "%REQ" + String(ntpClock.getUNIXTimeExt()) );
     }
-
-    twilio.delete_message(id);
     return;
   }
 
@@ -280,8 +274,7 @@ void processMessage(String dateTime, String from, String message, String id, Str
         twilio.send_message(from, "+16043739569", "Sorry " + message + ", the phone book doesn't support names longer than 32 characters. Please reply with a shorter name.");
       }
 
-      //Delete the message and exit the function before printing
-      twilio.delete_message(id);
+      //exit the function before printing
       return;
 
     //If the request is more than 24 hours old...
@@ -302,80 +295,44 @@ void processMessage(String dateTime, String from, String message, String id, Str
     from = "(" + from.substring(1, 4) + ") " + from.substring(4, 7) + " - " + from.substring(7,11);
   }
 
-  if(mediaResource != ""){
-    String mediaURL;
-    if(twilio.get_image(mediaResource, mediaURL)){
-      message += "\nIMAGE ATTACHED";
-      downloadImage("http://ackwxpcapo.cloudimg.io/v7/https://api.twilio.com" + mediaURL + "?p=fax");
-    }
-    
+  if(media != ""){
+    message += "\nIMAGE ATTACHED";
+    downloadImage("http://ackwxpcapo.cloudimg.io/v7/https://api.twilio.com" + media + "?p=fax");
   }
 
   printTitle("MESSAGE", 1); //Print a heading
-  if(dateTime == ""){
-    printTimestamp(0, true);
-  }else{
-    printStatus(ntpClock.convertDateTime(dateTime), 0); //Convert Twilio's date/time to a long timestamp and print it
-  }
+
+  printStatus(ntpClock.convertUnixTime(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
 
   printStatus("From: " + from, 1);
 
   printMessage(message, 0); //Print the message
   printLine(4); //Print a line
 
-  twilio.delete_message(id); //Delete the message
-
-}
-
-//Check for Messages from Twilio
-void checkMessages(){
-
-  //These hold the message details
-  String dateTime;
-  String from;
-  String message;
-  String id;
-  String media;
-
-  String response = twilio.check_for_messages(100);
-
-  //If there is a new message...
-  while(response.indexOf("</Message>") != -1){
-
-    message = response.substring(response.indexOf("<Body>") + 6, response.indexOf("</Body>"));
-    from = response.substring(response.indexOf("<From>") + 7, response.indexOf("</From>"));
-    dateTime = response.substring(response.indexOf("<DateSent>") + 10, response.indexOf("</DateSent>") - 6);
-    id = response.substring(response.indexOf("<Sid>") + 5, response.indexOf("</Sid>"));
-    if(response.substring(response.indexOf("<NumMedia>") + 10, response.indexOf("</NumMedia>")).toInt() > 0){
-            media = response.substring(response.indexOf("<Media>") + 7, response.indexOf("</Media>"));
-    }else{
-            media = "";
-    }
-
-    processMessage(dateTime, from, message, id, media);
-    
-    response = response.substring(response.indexOf("</Message>") + 10);
-    
-  }
-    
-
 }
 
 void MQTT_receive_message(char* topic, byte* payload, unsigned int length){
   String message;
-  for(int i=0;i<length;i++){
+  for(unsigned int i=0;i<length;i++){
     message += (char)payload[i];
   }
 
-  String media = "";
-  String body = message.substring(message.indexOf("body:") + 5, message.indexOf("\nnum_media:"));
+  String body = message.substring(message.indexOf("body:") + 5, message.indexOf("\nmedia:"));
   String from = message.substring(message.indexOf("from:") + 5, message.indexOf("\nbody:"));
   String id = message.substring(message.indexOf("id:") + 3, message.indexOf("\nfrom:"));
-  if(message.substring(message.indexOf("num_media:") + 10, message.length()).toInt() > 0){
-          //Do this if there is a photo attached. 
+  String media = message.substring(message.indexOf("media:") + 6, message.indexOf("\ntime:"));
+  String time = message.substring(message.indexOf("time:") + 5, message.length());
+
+  if(media != "0"){
+    media = "/2010-04-01/Accounts/AC6e91a7c91c69b11d1d621f9f09ce0858/Messages/" + id + "/Media/" + media;
+  }else{
+    media = "";
   }
 
-  processMessage("", from, body, id, media);
+  if(id != lastMessageID){
+    processMessage(time, from, body, id, media);
+    lastMessageID = id;
+  }
 
 }
 
@@ -401,11 +358,15 @@ void createHotspot(){
   }
 }
 
-void connectMQTT(){
+bool connectMQTT(){
 
-  if(MQTT_client.connect("fax-machine")){
-    MQTT_client.subscribe("smsin-16043739569");
+  if(MQTT_client.connect("fax-machine",NULL,NULL,"fax",0,false,"disconnect",false)){
+    MQTT_client.subscribe("smsin-16043739569",1);
+    
+    return true;
   }
+
+  return false;
 
 }
 
@@ -419,32 +380,24 @@ void connected(){
   }else{
     printError("Unable to Connect To Time Server!", 1); //Print an error if it fails
   }
-
-  //Attempt to connect to twilio
-  if(twilio.connect()){
-    statusTwilio = true; //Update the status
-    printHeading("Ready to Receive Messages!", 0);
-    printHeading("(604) 373 - 9569", 4);
-  }else{
-    printError("Unable to Connect To The Internet!", 3);
-  }
   
-  updated = false; //If we just did an OTA update and printing was inhibited, now printing is re-enabled
-
   wifiManager.setConnected(); //Let the wifiManager object know we have acknowledged a connection
 
-  connectMQTT();
+  if(connectMQTT()){
+    printHeading("Ready to Receive Messages!", 0);
+    printHeading("(604) 373 - 9569", 4);
+  }
 
-  /*
-  char* filename = "/www/test.jpg";
+  updated = false; //If we just did an OTA update and printing was inhibited, now printing is re-enabled
 
-  if(!SPIFFS.exists(filename)){
+
+  if(!SPIFFS.exists("/www/test.jpg")){
     consolePrint("File not found!");
   }else{
     consolePrint("File Found!");
   } 
 
-
+  /*
   TJpgDec.setJpgScale(1);
 
   TJpgDec.setCallback(jpg_output);
@@ -460,8 +413,8 @@ void connected(){
   //TJpgDec.drawFsJpg(0, 0, "/www/test.jpg");
 
   consolePrint("Time to Decode JPG: " + String(millis() - t) + "ms");
-
   */
+
 
 }
 
@@ -586,29 +539,11 @@ void loop() {
         }else{
           connectMQTT();
         }
-  
-        //If we're connected to Twilio...
-        if(statusTwilio){
-          //Check for messages every 1 minute
-          if(millis() > lastTwilioCheck + 300000 || lastTwilioCheck == 0){
-            lastTwilioCheck = millis();
-            checkMessages();
-          }
-        //If we're not connected to Twilio, attempt to connect
-        }else{
-          if(twilio.connect()){
-            statusTwilio = true; //Update the status
-            printTimestamp(1, true);
-            printHeading("Ready to Receive Messages!", 0);
-            printHeading("(604) 373 - 9569", 4);
-          }
-        }
 
         break;
 
     //WM_CONNECTION_LOST indicates we have just lost the wi-fi connection
     case WM_CONNECTION_LOST:
-        statusTwilio = false; //Change the Twilio status
         printTimestamp(0, true); //Print the time and an error
         printError("Lost WiFi Connection!", 0);
         setIdle(); //Set the status to idle

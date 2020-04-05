@@ -20,6 +20,8 @@ const uint32_t seventyYears = 2208988800UL; //Seventy Years offset
 int8_t zoneOffset = 0; //Offset from UTC in hours
 uint32_t lastUNIXTime = 0; //UNIX Time at last NTP response
 
+uint32_t extUnixTime = 0;
+
 //Initialize object, requires server and hour offset from UTC
 NTPClock::NTPClock(char* server, int8_t offset){ 
     NTPServer = server;
@@ -37,7 +39,11 @@ void sendNTPpacket(IPAddress& address){
 
 //Calculate the current UNIX Time based on the last NTP response
 uint32_t getUNIXTime(){ 
-    return lastUNIXTime + ((millis() - lastNTPResponse)/1000); 
+    if(extUnixTime == 0){
+        return lastUNIXTime + ((millis() - lastNTPResponse)/1000);
+    }else{
+         return extUnixTime + zoneOffset*3600;
+    }
 }
 
 uint32_t NTPClock::getUNIXTimeExt(){
@@ -339,6 +345,12 @@ String NTPClock::getTimestamp(){
     if(!handle()) return "####/##/##-##:##:##";
     
     return String(getYear()) + "/" + getMonth(true) + "/" + getDayOfMonth(true) + "-" + getHour(true, true) + ":" + getMinute(true) + ":" + getSecond(true);
+}
+
+String NTPClock::convertUnixTime(uint32_t extTime){
+    extUnixTime = extTime;
+    return getDateTime();
+    extUnixTime = 0;
 }
 
 //Convert the incoming date/time from Twilio into a long timestamp
