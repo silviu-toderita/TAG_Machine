@@ -5,7 +5,6 @@
 #include "ESP8266WebServer.h" //Web Server Library
 #include "WiFiClient.h" //WiFi Client Library
 #include "twilio.h" //Twilio Library
-#include "Adafruit_Thermal.h" //Thermal Printer Library
 #include "NTPClock.h" //Silviu's NTP Library
 #include "WiFiManager.h" //Silviu's WiFi Manager Library
 #include "WebInterface.h" //Silviu's Web Interface Library
@@ -13,11 +12,11 @@
 #include "Counter.h" //Silviu's Counter Library
 #include "PubSubClient.h" //MQTT Client Library
 #include "ESP8266HTTPClient.h" //For Downloading JPGs...
-#include "TJpg_Decoder.h" //For Decoding JPGs...
-
+#include "ThermalPrinter.h"
+#include "FS.h"
 
 NTPClock ntpClock((char*)("time.google.com"), -7); //Create an NTP object
-Adafruit_Thermal printer(&Serial); //Create a Thermal Printer object
+ThermalPrinter printer(&Serial, D7);
 WiFiManager wifiManager(10000); //Create a WiFi Manager object with a 10 second connection timeout
 WebInterface webInterface; //Create a Web Interface Object
 Storage phoneBook("phoneBook", 32); //Create a storage object for the phone book
@@ -30,54 +29,11 @@ Twilio twilio("AC6e91a7c91c69b11d1d621f9f09ce0858", "9cc8633f6e84411fd69e2a17b3e
 const char* deviceName = "faxmachine"; //Device Name
 const char* devicePassword = "sebastian"; //Device Password
 
-bool updated = false; //Did the device just do an OTA update?
-
 String lastMessageID;
 
-//Wrap text to a specified amount of characters
-String wrapText(String input, uint8_t wrapLength){
-
-  //No need to wrap text if it's less than the wrapLength
-  if(input.length() < wrapLength){
-    return input;
-  }
-
-  String output = ""; //This holds the output
-  uint8_t charThisLine = 1; //The character we're at on this line
-  uint16_t lastSpace = 0; //The last space we processed
-
-  //Run through this code once for each character in the input
-  for(uint16_t i=0; i<input.length(); i++){
-    
-    
-    if(charThisLine == 33){ //Once we reach the 33rd character in a line
-      if(input.charAt(i) == ' '){ //If the character is a space, change it to a new line
-        output.setCharAt(i, '\n');
-        charThisLine = 1;
-      }else if(input.charAt(i) == '\n'){ //If the character is a new line, do nothing
-        charThisLine = 1;
-      }else if(lastSpace <= i - wrapLength){ //If the last space was on the previous line, we're dealing with a really long word. Add a new line. 
-        output.setCharAt(i, '\n');
-        charThisLine = 1;
-      }else{ //If it's any other situation, we change the last space to a new line and record which character we're at on the next line
-        output.setCharAt(lastSpace, '\n');
-        charThisLine = i - lastSpace;
-      }
-    }
-
-    if(input.charAt(i) == ' '){ //If this character is a space, record it
-      lastSpace = i;
-    }
-
-    output += input.charAt(i); //Append the current character to the output string
-    charThisLine++; //Record that we're on the next character on this line
-  }
-
-  return output;
-}
 
 //Output text to the web console but not to the printer
-void consolePrint(String input, bool printed){
+void consolePrintln(String input, bool printed){
 
   String output = "<" + ntpClock.getTimestamp(); //Start with the timestamp
 
@@ -87,7 +43,7 @@ void consolePrint(String input, bool printed){
     output += ">~~~~ ";
   }
 
-  output += wrapText(input, 32); //Add the input text, wrapped to 32 characters 
+  output += input;
 
   //Any time there is a new line, add a time stamp
   if(printed){
@@ -100,90 +56,12 @@ void consolePrint(String input, bool printed){
 }
 
 //Output text to the web console but not to the printer, without having to specify it's for the console with a second argument
-void consolePrint(String input){
-  consolePrint(input, false);
+void console(String input){
+  consolePrintln(input, false);
 }
 
-//Output text to the web console and to the printer. Feed designates the amount of lines to feed after the text. Rest are parameters for printing. Size 1 = small, 2 = medium, 3 = large
-void printerPrint(String input, uint8_t feed, bool bold, bool inverse, bool center, uint8_t size){
-  
-  if(!updated){//If firmware was not just updated
-    printer.wake();
-    //Set the printing parameters
-    if(bold) printer.boldOn();
-    if(inverse) printer.inverseOn();
-    if(center) printer.justify('C');
-    if(size == 2) printer.setSize('M');
-    if(size == 3) printer.setSize('L');
-    //Print
-    printer.println(wrapText(input, 32)); 
-  } 
-  
-
-  consolePrint(input, true); //Output to the console
-
-
-  //If there is a feed specified
-  if(feed != 0){
-    if(!updated) printer.feed(feed); //Feed the printer if we haven't just updated
-    for(int i = 0; i < feed; i++){ //Print timestamps to the console
-      consolePrint(" ", true);
-    }
-  }
-
-  //Put the printer to sleep
-  printer.setDefault();
-  printer.sleep();
-}
-
-//Print a centered, large, bold, inverse title
-void printTitle(String text, uint8_t feed){
-
-  //If the text is shorter than 14 chars, add a space to either side and print. Otherwise, just print it. 
-  if(text.length() <= 14){
-    printerPrint(" " + text + " ", feed, true, true, true, 3);
-  }else{
-    printerPrint(wrapText(text, 16), feed, true, true, true, 3);
-  }
-}
-
-//Print a centered, bold, medium heading
-void printHeading(String text, uint8_t feed){
-  printerPrint(text, feed, true, false, true, 2);
-}
-
-//Print a medium, bold message
-void printMessage(String text, uint8_t feed){
-  printerPrint(text, feed, true, false, false, 2);
-}
-
-//Print a small, bold status
-void printStatus(String text, uint8_t feed){
-  printerPrint(text, feed, true, false, false, 1);
-}
-
-//Print a small, bold, inverse error
-void printError(String text, uint8_t feed){
-  updated = false; //If we just updated, resume printing to the printer
-  printerPrint("Error: " + text, feed, true, true, false, 1);
-}
-
-//Print a timestamp
-void printTimestamp(uint8_t feed, bool longDate){
-  //If we have a time, print it
-  if(ntpClock.handle()){
-    //Print a long date/time or just a short timestamp
-    if(longDate){
-      printerPrint(ntpClock.getDateTime(), feed, false, false, false, 1);
-    }else{
-      printerPrint(ntpClock.getTimestamp(), feed, false, false, false, 1);
-    }
-  }
-}
-
-//Print a dotted line
-void printLine(uint8_t feed){
-  printerPrint("------------------------", feed, false, false, true, 1);
+void consoleCallback(String input){
+  consolePrintln(input, true);
 }
 
 void downloadImage(String URL){
@@ -196,7 +74,7 @@ void downloadImage(String URL){
   // Start connection and send HTTP header
   int httpCode = http.GET();
   if (httpCode > 0) {
-    fs::File f = SPIFFS.open("/www/test.jpg", "w+");
+    fs::File f = SPIFFS.open("/image.bbf", "w+");
 
     // File found at server
     if (httpCode == HTTP_CODE_OK) {
@@ -236,7 +114,7 @@ void downloadImage(String URL){
   http.end();
 }
 
-void processMessage(String time, String from, String message, String id, String media){
+void processMessage(String time, String from, String message, String id){
 
   if(message == "$help"){
     twilio.send_message(from, "+16043739569", "This fax machine is operated by Silviu. For any issues, contact silviu.toderita@gmail.com.\n##FEATURES\nText: Supported\nEmojis: Not Supported\nPhotos: Coming Soon\nVideos: Not Supported\n##COMMANDS\n$help - Information\n$name - Change Your Name");
@@ -295,19 +173,14 @@ void processMessage(String time, String from, String message, String id, String 
     from = "(" + from.substring(1, 4) + ") " + from.substring(4, 7) + " - " + from.substring(7,11);
   }
 
-  if(media != ""){
-    message += "\nIMAGE ATTACHED";
-    downloadImage("http://ackwxpcapo.cloudimg.io/v7/https://api.twilio.com" + media + "?p=fax");
-  }
+  printer.printTitle("MESSAGE", 1); //Print a heading
 
-  printTitle("MESSAGE", 1); //Print a heading
+  printer.printStatus(ntpClock.convertUnixTime(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
 
-  printStatus(ntpClock.convertUnixTime(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
+  printer.printStatus("From: " + from, 1);
 
-  printStatus("From: " + from, 1);
-
-  printMessage(message, 0); //Print the message
-  printLine(4); //Print a line
+  printer.printMessage(message, 1); //Print the message
+  printer.printLine(4); //Print a line
 
 }
 
@@ -317,20 +190,28 @@ void MQTT_receive_message(char* topic, byte* payload, unsigned int length){
     message += (char)payload[i];
   }
 
-  String body = message.substring(message.indexOf("body:") + 5, message.indexOf("\nmedia:"));
-  String from = message.substring(message.indexOf("from:") + 5, message.indexOf("\nbody:"));
   String id = message.substring(message.indexOf("id:") + 3, message.indexOf("\nfrom:"));
+  String from = message.substring(message.indexOf("from:") + 5, message.indexOf("\nbody:"));
+  String body = message.substring(message.indexOf("body:") + 5, message.indexOf("\nmedia:"));
   String media = message.substring(message.indexOf("media:") + 6, message.indexOf("\ntime:"));
   String time = message.substring(message.indexOf("time:") + 5, message.length());
 
-  if(media != "0"){
-    media = "/2010-04-01/Accounts/AC6e91a7c91c69b11d1d621f9f09ce0858/Messages/" + id + "/Media/" + media;
-  }else{
-    media = "";
+  uint8_t num = media.substring(0, media.indexOf("w")).toInt();
+  uint16_t width = media.substring(media.indexOf("w") + 1, media.indexOf("h")).toInt();
+  uint16_t height = media.substring(media.indexOf("h") + 1, media.length()).toInt();
+
+  if(num != 0){
+    /*downloadImage("http://www.silviutoderita.com/output.txt");
+
+    File = SPIFFS.open("/image.bbf", "r");
+
+    printer.printBitmap(width, height, file);
+
+    file.close();*/
   }
 
   if(id != lastMessageID){
-    processMessage(time, from, body, id, media);
+    processMessage(time, from, body, id);
     lastMessageID = id;
   }
 
@@ -338,8 +219,8 @@ void MQTT_receive_message(char* topic, byte* payload, unsigned int length){
 
 //Set the WiFiManager status to idle to acknowledge that we've processed the disconnection
 void setIdle(){
-  printStatus("Searching for Networks...", 1);
-  printHeading("<-- Press Button to Start Hotspot", 3);
+  printer.printStatus("Searching for Networks...", 1);
+  printer.printHeading("<-- Press Button to Start Hotspot", 3);
   wifiManager.setIdle();
 }
 
@@ -347,14 +228,14 @@ void setIdle(){
 void createHotspot(){
   //If we can successfully create a hotspot, output the details
   if(wifiManager.createHotspot(deviceName, devicePassword)){
-    printStatus("Hotspot Started! ", 0);
-    printStatus("Network: " + String(deviceName), 0);
-    printStatus("Password: " + String(devicePassword), 1);
-    printHeading("<-- Press Button to Stop Hotspot", 3);
+    printer.printStatus("Hotspot Started! ", 0);
+    printer.printStatus("Network: " + String(deviceName), 0);
+    printer.printStatus("Password: " + String(devicePassword), 1);
+    printer.printHeading("<-- Press Button to Stop Hotspot", 3);
   //If we can't create a hotspot, output an error
   }else{
-    printError("Unable to Initialize Hotspot!", 0); //Output an error if we can't create the hotspot (not sure when this would ever happen)
-    printHeading("<-- Press Button to Retry", 3);
+    printer.printError("Unable to Initialize Hotspot!", 0); //Output an error if we can't create the hotspot (not sure when this would ever happen)
+    printer.printHeading("<-- Press Button to Retry", 3);
   }
 }
 
@@ -370,50 +251,27 @@ bool connectMQTT(){
 
 }
 
+
 //Set the WiFiManager status to connected to acknowledge that we've processed the connection
 void connected(){
-  printStatus("WiFi Connected: " + wifiManager.SSID(), 0); //Output the network
+  printer.printStatus("WiFi Connected: " + wifiManager.SSID(), 0); //Output the network
 
   //Attempt to connect to the NTP server for 2 seconds
   if(ntpClock.begin(2000)){
-    printTimestamp(1, true); //Print a timestamp if it succeeds
+    printer.printStatus(ntpClock.getDateTime(), true); //Print a timestamp if it succeeds
   }else{
-    printError("Unable to Connect To Time Server!", 1); //Print an error if it fails
+    printer.printError("Unable to Connect To Time Server!", 1); //Print an error if it fails
   }
   
   wifiManager.setConnected(); //Let the wifiManager object know we have acknowledged a connection
 
   if(connectMQTT()){
-    printHeading("Ready to Receive Messages!", 0);
-    printHeading("(604) 373 - 9569", 4);
+    printer.printHeading("Ready to Receive Messages!\n(604) 373 - 9569", 1);
   }
 
-  updated = false; //If we just did an OTA update and printing was inhibited, now printing is re-enabled
+  printer.printLine(4);
 
-
-  if(!SPIFFS.exists("/www/test.jpg")){
-    consolePrint("File not found!");
-  }else{
-    consolePrint("File Found!");
-  } 
-
-  /*
-  TJpgDec.setJpgScale(1);
-
-  TJpgDec.setCallback(jpg_output);
-
-  uint32_t t = millis();
-
-  uint16_t w = 0, h = 0;
-  TJpgDec.getFsJpgSize(&w, &h, filename); 
-
-  consolePrint("JPG Width: " + String(w) + ", JPG Height: " + String(h));
-
-
-  //TJpgDec.drawFsJpg(0, 0, "/www/test.jpg");
-
-  consolePrint("Time to Decode JPG: " + String(millis() - t) + "ms");
-  */
+  printer.suppress(false); //If we just did an OTA update and printing was inhibited, now printing is re-enabled
 
 
 }
@@ -423,6 +281,11 @@ void connected(){
 //#######################
 
 void setup() {
+  //Begin the serial connection to the printer
+  Serial.begin(9600);
+  Serial.set_tx(2);
+  printer.begin(consoleCallback);
+
   //Initialize the button and LED
   pinMode(D1, INPUT_PULLUP);
   pinMode(D2, OUTPUT);
@@ -435,6 +298,7 @@ void setup() {
   ArduinoOTA.setPassword(devicePassword); 
   //When an OTA update starts, update address 0 of EEPROM
   ArduinoOTA.onStart([](){
+    printer.offline();
     EEPROM.write(0,0);
     EEPROM.commit();
     SPIFFS.end(); //End SPIFFS if we're about to update the firmware
@@ -461,20 +325,14 @@ void setup() {
   EEPROM.begin(4);
   //Read the EEPROM to see if we have just completed an OTA update:
   if(EEPROM.read(0) == 0){ //If we have...
-    updated = true; //Set updated flag to true
+    printer.suppress(true); //Set updated flag to true
     EEPROM.write(0,1); //Reset EEPROM at 0 address
     EEPROM.commit();
-    consolePrint("OTA Update Successful, Rebooted!");
+    console("OTA Update Successful, Rebooted!");
   } 
 
-  //Begin the serial connection to the printer
-  Serial.begin(9600);
-  printer.begin();
-  printer.sleep();
-  //delay(100);
-
   //Print the title
-  printTitle("FAX MACHINE", 2);
+  printer.printTitle("FAX MACHINE", 2);
 
   //Add the network to the WiFi Manager
   wifiManager.addNetwork((char*)"Azaviu 2.4GHz", (char*)"sebastian");
@@ -485,9 +343,9 @@ void setup() {
   
   //If we can't establish a WiFi connection in the alloted timeout, print an error
   if(!wifiManager.begin()){
-    printError("Unable to Find Known Networks!", 0);  
-    printStatus("Searching for Networks...", 1);
-    printHeading("<-- Press Button to Start Hotspot", 3);
+    printer.printError("Unable to Find Known Networks!", 0);  
+    printer.printStatus("Searching for Networks...", 1);
+    printer.printHeading("<-- Press Button to Start Hotspot", 3);
   }
 
 }
@@ -524,7 +382,7 @@ void loop() {
 
     //WM_CONNECTION_FAILED indicates we have failed to connect to a network
     case WM_CONNECTION_FAILED:
-        printError("Unable to Connect To Network!", 0);  
+        printer.printError("Unable to Connect To Network!", 0);  
         setIdle(); //Set the status to Idle
         break;
 
@@ -544,8 +402,8 @@ void loop() {
 
     //WM_CONNECTION_LOST indicates we have just lost the wi-fi connection
     case WM_CONNECTION_LOST:
-        printTimestamp(0, true); //Print the time and an error
-        printError("Lost WiFi Connection!", 0);
+        printer.printStatus(ntpClock.getTimestamp(), true); //Print the time and an error
+        printer.printError("Lost WiFi Connection!", 0);
         setIdle(); //Set the status to idle
         break;
 
