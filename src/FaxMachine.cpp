@@ -16,7 +16,7 @@
 #include "FS.h"
 
 NTPClock ntpClock((char*)("time.google.com"), -7); //Create an NTP object
-ThermalPrinter printer(&Serial, D7);
+ThermalPrinter printer(115200, D7, true);
 WiFiManager wifiManager(10000); //Create a WiFi Manager object with a 10 second connection timeout
 WebInterface webInterface; //Create a Web Interface Object
 Storage phoneBook("phoneBook", 32); //Create a storage object for the phone book
@@ -64,60 +64,17 @@ void consoleCallback(String input){
   consolePrintln(input, true);
 }
 
-void downloadImage(String URL){
+void processMessage(String time, String from, String message, uint8_t media){
+  bool photo = false;
 
-  HTTPClient http;
-
-  // Configure server and url
-  http.begin(URL);
-
-  // Start connection and send HTTP header
-  int httpCode = http.GET();
-  if (httpCode > 0) {
-    fs::File f = SPIFFS.open("/image.bbf", "w+");
-
-    // File found at server
-    if (httpCode == HTTP_CODE_OK) {
-
-      // Get length of document (is -1 when Server sends no Content-Length header)
-      int total = http.getSize();
-      int len = total;
-
-      // Create buffer for read
-      uint8_t buff[128] = { 0 };
-
-      // Get tcp stream
-      WiFiClient * stream = http.getStreamPtr();
-
-      // Read all data from server
-      while (http.connected() && (len > 0 || len == -1)) {
-        // Get available data size
-        size_t size = stream->available();
-
-        if (size) {
-          // Read up to 128 bytes
-          int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
-
-          // Write it to file
-          f.write(buff, c);
-
-          // Calculate remaining bytes
-          if (len > 0) {
-            len -= c;
-          }
-        }
-        yield();
-      }
-    }
-    f.close();
+  if(message == "$photo"){
+    photo = true;
+    message = "";
   }
-  http.end();
-}
-
-void processMessage(String time, String from, String message, String id){
+  
 
   if(message == "$help"){
-    twilio.send_message(from, "+16043739569", "This fax machine is operated by Silviu. For any issues, contact silviu.toderita@gmail.com.\n##FEATURES\nText: Supported\nEmojis: Not Supported\nPhotos: Coming Soon\nVideos: Not Supported\n##COMMANDS\n$help - Information\n$name - Change Your Name");
+    twilio.send_message(from, "+16043739569", "This fax machine is operated by Silviu. For any issues, contact silviu.toderita@gmail.com.\n##FEATURES\nText: Supported\nEmojis: Coming Soon\nPhotos: Supported\nVideos: Not Supported\n##COMMANDS\n$help - Information\n$name - Change Your Name\n$photo - Photo Mode (No Info)");
     return;
   }
 
@@ -173,18 +130,24 @@ void processMessage(String time, String from, String message, String id){
     from = "(" + from.substring(1, 4) + ") " + from.substring(4, 7) + " - " + from.substring(7,11);
   }
 
-  printer.printTitle("MESSAGE", 1); //Print a heading
+  if(!photo) printer.printTitle("MESSAGE", 1); //Print a heading
 
-  printer.printStatus(ntpClock.convertUnixTime(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
+  if(!photo) printer.printStatus(ntpClock.convertUnixTime(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
 
-  printer.printStatus("From: " + from, 1);
+  if(!photo) printer.printStatus("From: " + from, 1);
 
-  printer.printMessage(message, 1); //Print the message
-  printer.printLine(4); //Print a line
+  if(!photo) printer.printMessage(message, 1); //Print the message
+
+  if(media != 0){
+    printer.printBitmap("http://silviutoderita.com/output.txt", 1);
+  }
+
+
+  if(!photo)printer.printLine(4, 4); //Print a line
 
 }
 
-void MQTT_receive_message(char* topic, byte* payload, unsigned int length){
+void newMessage(char* topic, byte* payload, unsigned int length){
   String message;
   for(unsigned int i=0;i<length;i++){
     message += (char)payload[i];
@@ -193,25 +156,11 @@ void MQTT_receive_message(char* topic, byte* payload, unsigned int length){
   String id = message.substring(message.indexOf("id:") + 3, message.indexOf("\nfrom:"));
   String from = message.substring(message.indexOf("from:") + 5, message.indexOf("\nbody:"));
   String body = message.substring(message.indexOf("body:") + 5, message.indexOf("\nmedia:"));
-  String media = message.substring(message.indexOf("media:") + 6, message.indexOf("\ntime:"));
+  uint8_t media = message.substring(message.indexOf("media:") + 6, message.indexOf("\ntime:")).toInt();
   String time = message.substring(message.indexOf("time:") + 5, message.length());
 
-  uint8_t num = media.substring(0, media.indexOf("w")).toInt();
-  uint16_t width = media.substring(media.indexOf("w") + 1, media.indexOf("h")).toInt();
-  uint16_t height = media.substring(media.indexOf("h") + 1, media.length()).toInt();
-
-  if(num != 0){
-    /*downloadImage("http://www.silviutoderita.com/output.txt");
-
-    File = SPIFFS.open("/image.bbf", "r");
-
-    printer.printBitmap(width, height, file);
-
-    file.close();*/
-  }
-
   if(id != lastMessageID){
-    processMessage(time, from, body, id);
+    processMessage(time, from, body, media);
     lastMessageID = id;
   }
 
@@ -269,9 +218,10 @@ void connected(){
     printer.printHeading("Ready to Receive Messages!\n(604) 373 - 9569", 1);
   }
 
-  printer.printLine(4);
+  printer.printLine(4, 4);
 
   printer.suppress(false); //If we just did an OTA update and printing was inhibited, now printing is re-enabled
+
 
 
 }
@@ -281,9 +231,6 @@ void connected(){
 //#######################
 
 void setup() {
-  //Begin the serial connection to the printer
-  Serial.begin(9600);
-  Serial.set_tx(2);
   printer.begin(consoleCallback);
 
   //Initialize the button and LED
@@ -303,6 +250,7 @@ void setup() {
     EEPROM.commit();
     SPIFFS.end(); //End SPIFFS if we're about to update the firmware
   });
+
   ArduinoOTA.begin();
 
   MDNS.begin(deviceName); //Start the mDNS
@@ -339,7 +287,7 @@ void setup() {
 
   //Set MQTT settings
   MQTT_client.setServer("silviutoderita.com", 1883);
-  MQTT_client.setCallback(MQTT_receive_message);
+  MQTT_client.setCallback(newMessage);
   
   //If we can't establish a WiFi connection in the alloted timeout, print an error
   if(!wifiManager.begin()){

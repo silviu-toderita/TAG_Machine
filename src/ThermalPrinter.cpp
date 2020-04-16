@@ -1,12 +1,24 @@
 #include "ThermalPrinter.h"
 
 
-ThermalPrinter::ThermalPrinter(Stream *s, uint8_t DTR){
-    stream = s;
-    dtrPin = DTR;
+ThermalPrinter::ThermalPrinter(uint32_t baudIn, uint8_t DTRin, bool port2In){
+    baud = baudIn;
+    DTR = DTRin;
+    port2 = port2In;
+}
+
+ThermalPrinter::ThermalPrinter(uint32_t baudIn, uint8_t DTRin){
+    ThermalPrinter(baudIn, DTRin, false);
 }
 
 void ThermalPrinter::begin(voidFuncPtr PrintCallback){
+    //Begin the serial connection to the printer
+    delay(100);
+    Serial.begin(baud);
+    if(port2){
+      Serial.set_tx(2);
+    }
+    
     delay(500);
     wake();
     writeBytes(ASCII_ESC, '@'); // Init command
@@ -30,7 +42,7 @@ void ThermalPrinter::begin(voidFuncPtr PrintCallback){
     // but slower printing speed.
 
     writeBytes(ASCII_ESC, '7');   // Esc 7 (print settings)
-    writeBytes(10, 150, 60); // Heating dots, heat time, heat interval
+    writeBytes(11, 120, 50); // Heating dots, heat time, heat interval
 
     // Print density description from manual:
     // DC2 # n Set printing density
@@ -45,18 +57,20 @@ void ThermalPrinter::begin(voidFuncPtr PrintCallback){
 
     writeBytes(ASCII_DC2, '#', (printBreakTime << 5) | printDensity);
 
-    pinMode(dtrPin, INPUT_PULLUP);
+    pinMode(DTR, INPUT_PULLUP);
     writeBytes(ASCII_GS, 'a', (1 << 5));
 
     _PrintCallback = PrintCallback;
 }
 
+void ThermalPrinter::offline(){
+  wake();
+  writeBytes(ASCII_ESC, '=', 0);
+}
 
 void ThermalPrinter::wake() {
-  writeBytes(255);
-  delay(50);
   writeBytes(ASCII_ESC, '8', 0, 0); // Sleep off
-  delay(50);
+  delay(10);
 }
 
 void ThermalPrinter::suppress(bool sup){
@@ -67,66 +81,42 @@ void ThermalPrinter::sleep() {
   writeBytes(ASCII_ESC, '8', 5, 5 >> 8);
 }
 
-void ThermalPrinter::offline(){
-  wake();
-  writeBytes(ASCII_ESC, '=', 0);
-}
-
 void ThermalPrinter::wait(){
-  while(digitalRead(dtrPin) == HIGH){
-    yield();
-  }
-
+  while(digitalRead(DTR) == HIGH) yield();
 }
 
 void ThermalPrinter::writeBytes(uint8_t a) {
     wait();
-    stream->write(a);
+    Serial.write(a);
 }
 
 void ThermalPrinter::writeBytes(uint8_t a, uint8_t b) {
   wait();
-  stream->write(a);
-  wait();
-  stream->write(b);
+  Serial.write(a);
+  Serial.write(b);
 }
 
 void ThermalPrinter::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
   wait();
-  stream->write(a);
-  wait();
-  stream->write(b);
-  wait();
-  stream->write(c);
+  Serial.write(a);
+  Serial.write(b);
+  Serial.write(c);
 
 }
 
 void ThermalPrinter::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
   wait();
-  stream->write(a);
-  wait();
-  stream->write(b);
-  wait();
-  stream->write(c);
-  wait();
-  stream->write(d);
-}
-
-size_t ThermalPrinter::write(uint8_t c) {
-  
-  if(c != 0x13) { // Strip carriage returns
-    wait();
-    stream->write(c);
-  }
-
-  
-  return 1;
+  Serial.write(a);
+  Serial.write(b);
+  Serial.write(c);
+  Serial.write(d);
 }
 
 void ThermalPrinter::output(String text){ 
     
     if(!suppressed){
-      println(text);
+      wait();
+      Serial.println(text);
     }
     _PrintCallback(text);
 }
@@ -295,7 +285,7 @@ void ThermalPrinter::printMessage(String text, uint8_t feedAmt){
   inverse(false);
   doubleHeight(true);
   doubleWidth(false);
-  bold(true);
+  bold(false);
 
   output(wrap(text, 32));
   feed(feedAmt);
@@ -308,7 +298,7 @@ void ThermalPrinter::printError(String text, uint8_t feedAmt){
   inverse(true);
   doubleHeight(false);
   doubleWidth(false);
-  bold(true);
+  bold(false);
 
   suppressed = false;
   output(wrap("ERROR: " + text, 32));
@@ -318,34 +308,97 @@ void ThermalPrinter::printError(String text, uint8_t feedAmt){
 }
 
 //Print a dotted line
-void ThermalPrinter::printLine(uint8_t feedAmt){
+void ThermalPrinter::printLine(uint8_t thick, uint8_t feedAmt){
+  _PrintCallback("------------------------");
+
   if(!suppressed){
     wake();
-    writeBytes(ASCII_DC2, '*', 4, 48);
+    writeBytes(ASCII_DC2, '*', thick, 48);
 
-    for(int i = 0;i<48;i++){
-      writeBytes(255, 255, 255, 255);
+    for(int i = 0;i<(48*thick);i++){
+      writeBytes(255);
     }
 
     feed(feedAmt);
     sleep();
   }
-  
-  _PrintCallback("------------------------");
 
 }
 
-void ThermalPrinter::printBitmap(uint8_t feedAmt){
-  wake();
+void ThermalPrinter::printBitmap(String URL, uint8_t feedAmt){
+  
+  HTTPClient http;
 
-  writeBytes(18, 42, 1, 24);
+  // Configure server and url
+  http.begin(URL);
 
-  for(int i = 0; i < 24; i++){
-    writeBytes(170);
+  // Start connection and send HTTP header
+  int httpCode = http.GET();
+  if (httpCode > 0) {
+
+    // File found at server
+    if (httpCode == HTTP_CODE_OK) {
+
+      // Get tcp stream
+      WiFiClient * stream = http.getStreamPtr();
+
+      wake();
+
+      // Read all data from server
+      while (http.connected()) {
+
+        uint16_t width;
+        uint16_t height;
+
+        uint8_t byteCounter = 0;
+        while(byteCounter < 4){
+          while(!stream->available()) yield();
+          if(byteCounter == 0){
+            width = stream->read() * 128;
+            byteCounter = 1;
+          }else if(byteCounter == 1){
+            width += stream->read();
+            byteCounter = 2;
+          }else if(byteCounter == 2){
+            height = stream->read() * 128;
+            byteCounter = 3;
+          }else{
+            height += stream->read();
+            byteCounter = 4;
+          }
+          
+        }
+
+        uint8_t widthBytes = width / 8;
+
+        while(height != 0){
+          uint8_t chunkHeight = 192;
+          if(height < 192){
+            chunkHeight = height;
+          }
+
+          writeBytes(ASCII_DC2, '*', chunkHeight, widthBytes);
+
+          for(int i = 0; i < (chunkHeight * widthBytes); i++){
+            while(!stream->available()) yield();
+            writeBytes(stream->read());
+          }
+
+          height = height - chunkHeight;
+        }
+
+
+        yield();
+      }
+
+      _PrintCallback("IMAGE ATTACHED");
+
+      feed(feedAmt);
+      sleep();
+
+    }
   }
 
-  feed(feedAmt);
+  http.end();
   
-  sleep();
-
 }

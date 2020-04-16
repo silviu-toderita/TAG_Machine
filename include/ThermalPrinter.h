@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "FS.h"
+#include "ESP8266HTTPClient.h"
 
 #define ASCII_TAB '\t' // Horizontal tab
 #define ASCII_LF  '\n' // Line feed
@@ -13,13 +14,11 @@
 typedef void (*voidFuncPtr)(const String input);
 static voidFuncPtr _PrintCallback;
 
-class ThermalPrinter : public Print {
+class ThermalPrinter{
     public:
 
-    ThermalPrinter(Stream *s=&Serial, uint8_t DTR = 255);
-
-    size_t
-        write(uint8_t c);
+    ThermalPrinter(uint32_t baudIn, uint8_t DTRin, bool port2In);
+    ThermalPrinter(uint32_t baudIn, uint8_t DTRin);
 
     void    
         begin(voidFuncPtr),
@@ -31,22 +30,20 @@ class ThermalPrinter : public Print {
         printHeading(String, uint8_t),
         printMessage(String, uint8_t),
         printError(String, uint8_t),
-        printLine(uint8_t),
-        printBitmap(uint8_t),
+        printLine(uint8_t, uint8_t),
+        printBitmap(String, uint8_t),
         feed(uint8_t);
-        
-
 
     private:
 
-    Stream  
-        *stream;
     uint8_t 
-        dtrPin,
+        DTR,
         printMode = 0;
+    uint32_t
+        baud;
     bool
-        suppressed = false;
-
+        suppressed = false,
+        port2;
     void
         wake(),
         sleep(),
