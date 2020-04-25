@@ -1,17 +1,18 @@
-#include "ThermalPrinter.h"
+#include "Thermal_Printer.h"
 
+static voidFuncPtr _PrintCallback;
 
-ThermalPrinter::ThermalPrinter(uint32_t baudIn, uint8_t DTRin, bool port2In){
+Thermal_Printer::Thermal_Printer(uint32_t baudIn, uint8_t DTRin, bool port2In){
     baud = baudIn;
     DTR = DTRin;
     port2 = port2In;
 }
 
-ThermalPrinter::ThermalPrinter(uint32_t baudIn, uint8_t DTRin){
-    ThermalPrinter(baudIn, DTRin, false);
+Thermal_Printer::Thermal_Printer(uint32_t baudIn, uint8_t DTRin){
+    Thermal_Printer(baudIn, DTRin, false);
 }
 
-void ThermalPrinter::begin(voidFuncPtr PrintCallback){
+void Thermal_Printer::begin(voidFuncPtr PrintCallback){
     //Begin the serial connection to the printer
     delay(100);
     Serial.begin(baud);
@@ -42,7 +43,7 @@ void ThermalPrinter::begin(voidFuncPtr PrintCallback){
     // but slower printing speed.
 
     writeBytes(ASCII_ESC, '7');   // Esc 7 (print settings)
-    writeBytes(11, 120, 50); // Heating dots, heat time, heat interval
+    writeBytes(11, 100, 60); // Heating dots, heat time, heat interval
 
     // Print density description from manual:
     // DC2 # n Set printing density
@@ -63,40 +64,40 @@ void ThermalPrinter::begin(voidFuncPtr PrintCallback){
     _PrintCallback = PrintCallback;
 }
 
-void ThermalPrinter::offline(){
+void Thermal_Printer::offline(){
   wake();
   writeBytes(ASCII_ESC, '=', 0);
 }
 
-void ThermalPrinter::wake() {
+void Thermal_Printer::wake() {
   writeBytes(ASCII_ESC, '8', 0, 0); // Sleep off
-  delay(10);
+  delay(20);
 }
 
-void ThermalPrinter::suppress(bool sup){
+void Thermal_Printer::suppress(bool sup){
     suppressed = sup;
 }
 
-void ThermalPrinter::sleep() {
+void Thermal_Printer::sleep() {
   writeBytes(ASCII_ESC, '8', 5, 5 >> 8);
 }
 
-void ThermalPrinter::wait(){
+void Thermal_Printer::wait(){
   while(digitalRead(DTR) == HIGH) yield();
 }
 
-void ThermalPrinter::writeBytes(uint8_t a) {
+void Thermal_Printer::writeBytes(uint8_t a) {
     wait();
     Serial.write(a);
 }
 
-void ThermalPrinter::writeBytes(uint8_t a, uint8_t b) {
+void Thermal_Printer::writeBytes(uint8_t a, uint8_t b) {
   wait();
   Serial.write(a);
   Serial.write(b);
 }
 
-void ThermalPrinter::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
+void Thermal_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
   wait();
   Serial.write(a);
   Serial.write(b);
@@ -104,7 +105,7 @@ void ThermalPrinter::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
 
 }
 
-void ThermalPrinter::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+void Thermal_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
   wait();
   Serial.write(a);
   Serial.write(b);
@@ -112,7 +113,7 @@ void ThermalPrinter::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
   Serial.write(d);
 }
 
-void ThermalPrinter::output(String text){ 
+void Thermal_Printer::output(String text){ 
     
     if(!suppressed){
       wait();
@@ -121,7 +122,7 @@ void ThermalPrinter::output(String text){
     _PrintCallback(text);
 }
 
-void ThermalPrinter::feed(uint8_t x){
+void Thermal_Printer::feed(uint8_t x){
     if(!suppressed){
       writeBytes(ASCII_ESC, 'd', x);
     }
@@ -132,7 +133,7 @@ void ThermalPrinter::feed(uint8_t x){
 }
 
 //Wrap text to a specified amount of characters
-String ThermalPrinter::wrap(String input, uint8_t wrapLength){
+String Thermal_Printer::wrap(String input, uint8_t wrapLength){
 
   //No need to wrap text if it's less than the wrapLength
   if(input.length() < wrapLength){
@@ -177,7 +178,7 @@ String ThermalPrinter::wrap(String input, uint8_t wrapLength){
   return output;
 }
 
-void ThermalPrinter::center(bool on){
+void Thermal_Printer::center(bool on){
     if(on){
         writeBytes(ASCII_ESC, 'a', 1); 
     }else{
@@ -185,7 +186,7 @@ void ThermalPrinter::center(bool on){
     }  
 }
 
-void ThermalPrinter::inverse(bool on){
+void Thermal_Printer::inverse(bool on){
     if(on){
         writeBytes(ASCII_GS, 'B', 1); 
     }else{
@@ -196,7 +197,7 @@ void ThermalPrinter::inverse(bool on){
 
 }
 
-void ThermalPrinter::doubleHeight(bool on){
+void Thermal_Printer::doubleHeight(bool on){
     if(on){
         printMode |= (1<<4);
     }else{
@@ -206,7 +207,7 @@ void ThermalPrinter::doubleHeight(bool on){
     writePrintMode();
 }
 
-void ThermalPrinter::doubleWidth(bool on){
+void Thermal_Printer::doubleWidth(bool on){
     if(on){
         printMode |= (1<<5);
     }else{
@@ -216,7 +217,7 @@ void ThermalPrinter::doubleWidth(bool on){
     writePrintMode();
 }
 
-void ThermalPrinter::bold(bool on){
+void Thermal_Printer::bold(bool on){
     if(on){
         printMode |= (1<<3);
     }else{
@@ -226,11 +227,11 @@ void ThermalPrinter::bold(bool on){
     writePrintMode();
 }
 
-void ThermalPrinter::writePrintMode() {
+void Thermal_Printer::writePrintMode() {
   writeBytes(ASCII_ESC, '!', printMode);
 }
 
-void ThermalPrinter::printStatus(String text, uint8_t feedAmt){
+void Thermal_Printer::printStatus(String text, uint8_t feedAmt){
     wake();
     center(false);
     inverse(false);
@@ -245,7 +246,7 @@ void ThermalPrinter::printStatus(String text, uint8_t feedAmt){
 }
 
 //Print a centered, large, bold, inverse title
-void ThermalPrinter::printTitle(String text, uint8_t feedAmt){
+void Thermal_Printer::printTitle(String text, uint8_t feedAmt){
     wake();
     center(true);
     inverse(true);
@@ -265,7 +266,7 @@ void ThermalPrinter::printTitle(String text, uint8_t feedAmt){
 }
 
 //Print a centered, bold, medium heading
-void ThermalPrinter::printHeading(String text, uint8_t feedAmt){
+void Thermal_Printer::printHeading(String text, uint8_t feedAmt){
   wake();
   center(true);
   inverse(false);
@@ -279,20 +280,20 @@ void ThermalPrinter::printHeading(String text, uint8_t feedAmt){
 
 }
 
-void ThermalPrinter::printMessage(String text, uint8_t feedAmt){
+void Thermal_Printer::printMessage(String text, uint8_t feedAmt){
   wake();
   center(false);
   inverse(false);
   doubleHeight(true);
   doubleWidth(false);
-  bold(false);
+  bold(true);
 
   output(wrap(text, 32));
   feed(feedAmt);
   sleep();
 }
 
-void ThermalPrinter::printError(String text, uint8_t feedAmt){
+void Thermal_Printer::printError(String text, uint8_t feedAmt){
   wake();
   center(false);
   inverse(true);
@@ -308,7 +309,7 @@ void ThermalPrinter::printError(String text, uint8_t feedAmt){
 }
 
 //Print a dotted line
-void ThermalPrinter::printLine(uint8_t thick, uint8_t feedAmt){
+void Thermal_Printer::printLine(uint8_t thick, uint8_t feedAmt){
   _PrintCallback("------------------------");
 
   if(!suppressed){
@@ -325,7 +326,7 @@ void ThermalPrinter::printLine(uint8_t thick, uint8_t feedAmt){
 
 }
 
-void ThermalPrinter::printBitmap(String URL, uint8_t feedAmt){
+void Thermal_Printer::printBitmap(const char* URL, uint8_t feedAmt){
   
   HTTPClient http;
 
@@ -391,7 +392,7 @@ void ThermalPrinter::printBitmap(String URL, uint8_t feedAmt){
         yield();
       }
 
-      _PrintCallback("IMAGE ATTACHED");
+      _PrintCallback("<IMAGE>");
 
       feed(feedAmt);
       sleep();

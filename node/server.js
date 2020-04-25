@@ -1,108 +1,192 @@
-const http = require('http');
+const http = require('http'); 
 const express = require('express');
 const {urlencoded} = require('body-parser');
-const Jimp = require("jimp");
-var mqtt = require('mqtt');
-var floydSteinberg = require('floyd-steinberg');
-var fs = require('fs');
-var PNG = require('pngjs').PNG;
+const mqtt = require('mqtt'); //MQTT Library
+const floydSteinberg = require('floyd-steinberg'); //Dithering Library
+const fs = require('fs'); //File System Library
+const Jimp = require('jimp'); //Javascript Image Manipulation Program
+const storage = require('node-persist');
 
-var mqtt_options = {
+
+//Buffer object that can be assigned 1 byte or 1 bit at a time
+function BitBuffer(size){
+    this.buffer = Buffer.alloc(Math.floor(size/8)); //Initialize a byte buffer
+    var currentBit = 0; //Start us off at bit 0
+
+    //Function for setting a single bit
+    this.setBit = function(value) {
+        var byte = Math.floor(currentBit / 8); //Determine which byte we're on
+        var bit = 7 - (currentBit % 8); //Determine which bit of the current byte we're on
+    
+        //If the bit should be zero, set it to 0
+        if(value == 0){
+            this.buffer[byte] &=  ~(1 << bit);
+        //Otherwise, set it to 1
+        }else{
+            this.buffer[byte] |= (1 << bit);
+        }
+        //Increment the current bit by one
+        currentBit++;
+    }
+
+    //Function for setting a single byte. Note that this function will overwrite any bits written to the current byte already
+    this.setByte = function(value){
+        var byte = Math.floor(currentBit / 8); //Determine which byte we're on
+        this.buffer[byte] = value; //Set the value
+
+        currentBit = currentBit + 8; //Increment the current bit by 8
+    }
+
+}
+
+//This function saves the image as a 1-bit bitmap text file
+function saveImage(URL){
+
+    //Wrap function in promise to only return once processing is done
+    return new Promise(function(resolve, reject){
+        //Read the image
+        Jimp.read(URL, async (err, image) => {
+            //Scale it to fit the maximum width of 384
+            image.scaleToFit(384, Jimp.AUTO);
+
+            //If the width is not a multiple of 8, pad the sides up to the next multiple of 8
+            if(image.bitmap.width % 8 != 0){
+                var padding = 8 - (image.bitmap.width % 8);
+                image.contain(image.bitmap.width + padding, Jimp.AUTO);
+            }
+
+        
+            var size = image.bitmap.width * image.bitmap.height; //The amount of pixels in this image
+    
+            //Go through each pixel. If any pixel has slight transparency and is black, change it to white. 
+            for(var i = 0; i < size * 4; i = i + 4){
+                if(image.bitmap.data[i+3] < 255 && image.bitmap.data[i] == 0 && image.bitmap.data[i+1] == 0 && image.bitmap.data[i+2] == 0){
+                    image.bitmap.data[i] = 255;
+                    image.bitmap.data[i+1] = 255;
+                    image.bitmap.data[i+2] = 255;
+                }
+            }
+    
+            //Dither the image, turning it into a 1-bit bitmap
+            var ditherImage = floydSteinberg(image.bitmap);
+    
+            //Create new bit buffer
+            let buffer = new BitBuffer(size + 32);
+            
+            //Assign the first 4 bytes of the buffer to the width & height
+            buffer.setByte(Math.floor(ditherImage.width/128));
+            buffer.setByte(ditherImage.width%128);
+            buffer.setByte(Math.floor(ditherImage.height/128));
+            buffer.setByte(ditherImage.height%128);
+    
+            //Write each pixel to the buffer. We only write every 4th pixel, as the bitmap is still in 32-bit format. 
+            for(var i = 0; i < size * 4; i = i + 4){
+                if(ditherImage.data[i] == 0){
+                    buffer.setBit(1);
+                }else{
+                    buffer.setBit(0);
+                }
+    
+            }
+            
+            var imageNum = 1;
+            var storedImageNum = await storage.getItem('imageNum');
+            if(storedImageNum < 255){
+                imageNum = storedImageNum + 1;
+            }
+
+            //Output the file
+            fs.writeFileSync("/var/www/silviutoderita-com/img/" + imageNum + ".bbf", buffer.buffer);
+
+            await storage.setItem('imageNum', imageNum);
+
+            resolve(imageNum);
+        });
+    });
+    
+}
+
+storage.init();
+
+//Connect to the local MQTT Server
+var mqtt_client = mqtt.connect('http://localhost', {
     port: 1883,
     username: 'silviu',
     password: 'sebastian'
-};
-
-var mqtt_client = mqtt.connect('http://localhost',mqtt_options);
-
-mqtt_client.on('connect', function(){
-    console.log('Connected to MQTT Broker\n----------------');
 });
 
 
-const app = express();
+//Publish MQTT message
+async function sendMessage(data){
+    var media; //This variable will store any image numbers in this message
+    //If there are no images, send 0
+    if(data.numMedia == 0){
+        media = '0';
+    }else{
+        //If there are images, save each one and add its number to the media variable
+        for(var i = 0; i < data.numMedia; i++){
+            var currentImg = String(await saveImage(data.media[i]));
+            
+            if(media){
+                media = media + currentImg;
+            }else{
+                media = currentImg;
+            }
 
+            if(i != data.numMedia - 1){
+                media = media + ',';
+            }
+        }
+        
+    }
+
+    //Form the MQTT message
+    mqtt_message = `id:${data.id}\nfrom:${data.from}\nbody:${data.body}\nmedia:${media}\ntime:${data.time}`;
+
+    //Publish the MQTT message
+    mqtt_client.publish(`smsin-${data.to}`, mqtt_message, {qos:1});
+    console.log(`Published MQTT Message!\nTopic: smsin-${data.to} \nMessage:\n----\n${mqtt_message}\n----------------`); 
+}
+
+
+//Use express library
+const app = express();
 app.use(urlencoded({ extended: false}));
 
-app.post( '/sms', ( req, res ) => {
+//Do this if we get a POST request
+app.post( '/sms', (req, res)  => {
 
-    var id = req.body.MessageSid;
-    var from = req.body.From.slice(1);
-    var to = req.body.To.slice(1);
-    var body = req.body.Body;
-    var time = Math.floor(Date.now()/1000);
-    var media = req.body.NumMedia;
+    console.log(`Webhook received from Twilio...`);
 
-    console.log(`Webhook received from Twilio to: ${to}`);
-
+    //Respond to Twilio so it's happy
     res.writeHead(200, {'Content-Type': 'text/xml'});
     res.end('<Response></Response>');
 
-    if(media != "0"){
-
-        const request = http.get("http://ackwxpcapo.cloudimg.io/v7/" + req.body.MediaUrl0 + "?p=fax", function(response){
-            response.pipe(new PNG()).on('parsed', function(){
-                var ditherImage = floydSteinberg(this);
-
-                var size = ditherImage.width * ditherImage.height;
-
-                var buffer = Buffer.alloc(size/8 + 4);
-
-                buffer.writeUInt8(Math.floor(ditherImage.width/128), 0);
-                buffer.writeUInt8(ditherImage.width%128, 1);
-                buffer.writeUInt8(Math.floor(ditherImage.height/128), 2);
-                buffer.writeUInt8(ditherImage.height%128, 3);
-                
-                var byte = 0;
-                var bitCounter = 7;
-                var byteCounter = 4;
-                for(var i = 0; i < size * 4; i = i + 4){
-                    if(ditherImage.data[i] == 0){
-                        byte |= (1<<bitCounter);
-                    }else{
-                        byte |= (0<<bitCounter);
-                    }
-
-                    if(bitCounter == 0){
-                        bitCounter = 7;
-                        buffer.writeUInt8(byte, byteCounter);
-                        byte = 0;
-                        byteCounter++;
-                    }else{
-                        bitCounter = bitCounter - 1;
-                    }
-                }
-
-                fs.writeFileSync("/var/www/silviutoderita-com/output.txt", buffer, function(err){
-                    if(err){
-                        return console.log(err);
-                    }
-                    console.log("File Saved!");
-                });  
-
-            var mqtt_message = `id:${id}\nfrom:${from}\nbody:${body}\nmedia:${media}\ntime:${time}`;
-
-            mqtt_client.publish(`smsin-${to}`, mqtt_message, {qos:1});
-            console.log(`Published MQTT Message!\nTopic: smsin-${to} \nMessage:\n----\n${mqtt_message}\n----------------`);
-            });
-
-            
-        });
-
-    }else{
-        var mqtt_message = `id:${id}\nfrom:${from}\nbody:${body}\nmedia:${media}\ntime:${time}`;
-
-        mqtt_client.publish(`smsin-${to}`, mqtt_message, {qos:1});
-        console.log(`Published MQTT Message!\nTopic: smsin-${to} \nMessage:\n----\n${mqtt_message}\n----------------`); 
-    }
-
-
-
-
-
-
+    //Send a message using MQTT, pass all relevant data from Twilio's webhook
+    sendMessage({
+        to: req.body.To.slice(1),
+        from: req.body.From.slice(1),
+        id: req.body.MessageSid,
+        body: req.body.Body,
+        numMedia: parseInt(req.body.NumMedia),
+        media: [
+            req.body.MediaUrl0,
+            req.body.MediaUrl1,
+            req.body.MediaUrl2,
+            req.body.MediaUrl3,
+            req.body.MediaUrl4,
+            req.body.MediaUrl5,
+            req.body.MediaUrl6,
+            req.body.MediaUrl7,
+            req.body.MediaUrl8,
+            req.body.MediaUrl9
+        ],
+        time: Math.floor(Date.now()/1000)
+    });
+        
 });
 
+//Set up the server to listen on port 3000
 http.createServer(app).listen(3000, () => {
     console.log('Server listening for Twilio webhooks');
 });

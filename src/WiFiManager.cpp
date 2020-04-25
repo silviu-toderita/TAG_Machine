@@ -1,5 +1,4 @@
 #include "ESP8266WiFi.h" //WiFi Library"
-#include "Counter.h" //Silviu's Counter Library
 #include "WiFiManager.h"
 
 char* networkSSID[256]; //WiFi Network Name

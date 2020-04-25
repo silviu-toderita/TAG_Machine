@@ -12,13 +12,12 @@
 #define ASCII_GS   29  // Group separator
 
 typedef void (*voidFuncPtr)(const String input);
-static voidFuncPtr _PrintCallback;
 
-class ThermalPrinter{
+class Thermal_Printer{
     public:
 
-    ThermalPrinter(uint32_t baudIn, uint8_t DTRin, bool port2In);
-    ThermalPrinter(uint32_t baudIn, uint8_t DTRin);
+    Thermal_Printer(uint32_t baudIn, uint8_t DTRin, bool port2In);
+    Thermal_Printer(uint32_t baudIn, uint8_t DTRin);
 
     void    
         begin(voidFuncPtr),
@@ -31,7 +30,7 @@ class ThermalPrinter{
         printMessage(String, uint8_t),
         printError(String, uint8_t),
         printLine(uint8_t, uint8_t),
-        printBitmap(String, uint8_t),
+        printBitmap(const char*, uint8_t),
         feed(uint8_t);
 
     private:

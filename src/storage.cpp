@@ -1,6 +1,6 @@
 //Library for storing String variables in a file on ESP8266 Flash
 
-#include "storage.h"
+#include "Storage.h"
 #include "fs.h" //SPI Flash File System (SPIFFS) Library
 
 String filename;

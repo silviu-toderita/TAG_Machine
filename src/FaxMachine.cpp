@@ -1,22 +1,21 @@
 #include "Arduino.h" //Arduino Library
-#include "ESP8266mDNS.h" //multicast DNS Library
 #include "ArduinoOTA.h" //Over-The-Air Update Library
 #include "EEPROM.h" //EEPROM Library
-#include "ESP8266WebServer.h" //Web Server Library
-#include "WiFiClient.h" //WiFi Client Library
-#include "twilio.h" //Twilio Library
-#include "NTPClock.h" //Silviu's NTP Library
-#include "WiFiManager.h" //Silviu's WiFi Manager Library
-#include "WebInterface.h" //Silviu's Web Interface Library
-#include "storage.h" //Silviu's local storage library
-#include "Counter.h" //Silviu's Counter Library
-#include "PubSubClient.h" //MQTT Client Library
-#include "ESP8266HTTPClient.h" //For Downloading JPGs...
-#include "ThermalPrinter.h"
-#include "FS.h"
+#include "Storage.h" //Silviu's Persistent Storage library
 
-NTPClock ntpClock((char*)("time.google.com"), -7); //Create an NTP object
-ThermalPrinter printer(115200, D7, true);
+//Network Libraries
+#include "WiFiManager.h" //Silviu's WiFi Manager Library
+#include "ESP8266mDNS.h" //multicast DNS Library
+#include "WebInterface.h" //Silviu's Web Interface Library
+#include "Twilio.h" //Twilio Library
+#include "NTP_Clock.h" //Silviu's NTP Library
+#include "PubSubClient.h" //MQTT Client Library
+
+#include "Thermal_Printer.h" //Silviu's Thermal Printer Library
+
+
+NTP_Clock ntp_clock; //Create an NTP object
+Thermal_Printer printer(115200, D7, true); //Create a printer object
 WiFiManager wifiManager(10000); //Create a WiFi Manager object with a 10 second connection timeout
 WebInterface webInterface; //Create a Web Interface Object
 Storage phoneBook("phoneBook", 32); //Create a storage object for the phone book
@@ -35,7 +34,7 @@ String lastMessageID;
 //Output text to the web console but not to the printer
 void consolePrintln(String input, bool printed){
 
-  String output = "<" + ntpClock.getTimestamp(); //Start with the timestamp
+  String output = "<" + ntp_clock.get_timestamp(); //Start with the timestamp
 
   if(printed){ //If this was not printed, append tildes
     output += "> ";
@@ -47,9 +46,9 @@ void consolePrintln(String input, bool printed){
 
   //Any time there is a new line, add a time stamp
   if(printed){
-    output.replace("\n","\n<" + ntpClock.getTimestamp() + "> "); 
+    output.replace("\n","\n<" + ntp_clock.get_timestamp() + "> "); 
   }else{
-    output.replace("\n","\n<" + ntpClock.getTimestamp() + ">~~~~ "); 
+    output.replace("\n","\n<" + ntp_clock.get_timestamp() + ">~~~~ "); 
   }
   
   webInterface.println(output); //Print the text
@@ -64,7 +63,7 @@ void consoleCallback(String input){
   consolePrintln(input, true);
 }
 
-void processMessage(String time, String from, String message, uint8_t media){
+void processMessage(String time, String from, String message, String media){
   bool photo = false;
 
   if(message == "$photo"){
@@ -81,7 +80,7 @@ void processMessage(String time, String from, String message, uint8_t media){
   if(message == "$name"){
     if(twilio.send_message(from, "+16043739569", "Please reply with a new name within 24hrs to add it to the phone book. For more options, reply with \"$help\".")){
       //Store the timestamp when we requested a name from the sender
-      phoneBook.put(from, "%REQ" + String(ntpClock.getUNIXTimeExt()) );
+      phoneBook.put(from, "%REQ" + time);
     }
     return;
   }
@@ -94,17 +93,19 @@ void processMessage(String time, String from, String message, uint8_t media){
     //Send a message asking the sender to reply with a name
     if(twilio.send_message(from, "+16043739569", "Thanks for messaging Silviu's Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
       //Store the timestamp when we requested a name from the sender
-      phoneBook.put(from, "%REQ" + String(ntpClock.getUNIXTimeExt()) );
+      phoneBook.put(from, "%REQ" + time);
     }
 
+  name = from;
   //If we requested a name already...
-  }else if(name.substring(0,4) == "%REQ"){
+  }else if(name.substring(0,4) == "%REQ" && message != ""){
     //If the request is less than 24 hours old...
-    if(int(ntpClock.getUNIXTimeExt()) <= name.substring(4).toInt() + 86400){
+    if(time.toInt() <= name.substring(4).toInt() + 86400){
 
       //Let the sender know their name has been stored and store it. 
       if(phoneBook.put(from, message)){
         twilio.send_message(from, "+16043739569", "Thanks " + message + ", your name and number has been added to the phone book. To change your name, reply with \"$name\". For more options, reply with \"$help\".");
+      name = message;
       }else{
         twilio.send_message(from, "+16043739569", "Sorry " + message + ", the phone book doesn't support names longer than 32 characters. Please reply with a shorter name.");
       }
@@ -117,32 +118,50 @@ void processMessage(String time, String from, String message, uint8_t media){
       //Send a message asking the sender to reply with a name
       if(twilio.send_message(from, "+16043739569", "Thanks for messaging Silviu's Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
         //Store the timestamp when we requested a name from the sender
-        phoneBook.put(from, "%REQ" + String(ntpClock.getUNIXTimeExt()) );
+        phoneBook.put(from, "%REQ" + time);
       }
     }
-
+  name = from;
   //If we have a name stored, use that
-  }else{
-    from = name;
   }
 
-  if(from.substring(0,1) == "1" && name.substring(0,1) != "1"){
-    from = "(" + from.substring(1, 4) + ") " + from.substring(4, 7) + " - " + from.substring(7,11);
+  if(from.substring(0,1) == "1" && name == from){
+    name = "(" + from.substring(1, 4) + ") " + from.substring(4, 7) + " - " + from.substring(7,11);
   }
 
   if(!photo) printer.printTitle("MESSAGE", 1); //Print a heading
 
-  if(!photo) printer.printStatus(ntpClock.convertUnixTime(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
+  if(!photo) printer.printStatus(ntp_clock.get_date_time(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
 
-  if(!photo) printer.printStatus("From: " + from, 1);
+  if(!photo) printer.printStatus("From: " + name, 1);
 
   if(!photo) printer.printMessage(message, 1); //Print the message
 
-  if(media != 0){
-    printer.printBitmap("http://silviutoderita.com/output.txt", 1);
+  if(media != "0"){
+    uint8_t mediaCount = 1;
+    String mediaNum[10];
+    for(uint8_t i = 0; i < media.length(); i++){
+      if(media.charAt(i) == ','){
+        mediaCount++;
+      }else{
+        mediaNum[mediaCount-1] += media.charAt(i);
+      }
+    }
+
+    for(uint8_t i = 0; i < mediaCount; i++){
+      if(mediaNum[i] == "NS"){
+        printer.printMessage("<UNSUPPORTED ATTACHMENT>", 1);
+        twilio.send_message(from, "+16043739569", "Sorry " + name + ", but your message contained media in a format that's not supported. Only .jpg, .png, and .gif images are supported.");
+      }else{
+        const char* URL = "http://silviutoderita.com/img/";
+        printer.printBitmap(URL, 1);
+      }
+      
+    }
+    
   }
 
-
+  
   if(!photo)printer.printLine(4, 4); //Print a line
 
 }
@@ -156,7 +175,7 @@ void newMessage(char* topic, byte* payload, unsigned int length){
   String id = message.substring(message.indexOf("id:") + 3, message.indexOf("\nfrom:"));
   String from = message.substring(message.indexOf("from:") + 5, message.indexOf("\nbody:"));
   String body = message.substring(message.indexOf("body:") + 5, message.indexOf("\nmedia:"));
-  uint8_t media = message.substring(message.indexOf("media:") + 6, message.indexOf("\ntime:")).toInt();
+  String media = message.substring(message.indexOf("media:") + 6, message.indexOf("\ntime:"));
   String time = message.substring(message.indexOf("time:") + 5, message.length());
 
   if(id != lastMessageID){
@@ -206,8 +225,8 @@ void connected(){
   printer.printStatus("WiFi Connected: " + wifiManager.SSID(), 0); //Output the network
 
   //Attempt to connect to the NTP server for 2 seconds
-  if(ntpClock.begin(2000)){
-    printer.printStatus(ntpClock.getDateTime(), true); //Print a timestamp if it succeeds
+  if(ntp_clock.begin()){
+    printer.printStatus(ntp_clock.get_date_time(), true); //Print a timestamp if it succeeds
   }else{
     printer.printError("Unable to Connect To Time Server!", 1); //Print an error if it fails
   }
@@ -258,8 +277,8 @@ void setup() {
   //Bootloader code
   if(!digitalRead(D1)){
     wifiManager.createHotspot(deviceName, devicePassword);
-    Counter counter(60000);
-    while(!counter.status()){
+    uint32_t start = millis();
+    while(millis() < start + 60000){
       digitalWrite(D2, LOW);
       delay(250);
       digitalWrite(D2, HIGH);
@@ -303,7 +322,7 @@ void setup() {
 //######################
 
 void loop() {
-  ntpClock.handle(); //Update the clock
+  ntp_clock.handle(); //Update the clock
   
   //Handle the WiFiManager every loop and pull the status
   switch(wifiManager.handle()){
@@ -350,7 +369,7 @@ void loop() {
 
     //WM_CONNECTION_LOST indicates we have just lost the wi-fi connection
     case WM_CONNECTION_LOST:
-        printer.printStatus(ntpClock.getTimestamp(), true); //Print the time and an error
+        printer.printStatus(ntp_clock.get_timestamp(), true); //Print the time and an error
         printer.printError("Lost WiFi Connection!", 0);
         setIdle(); //Set the status to idle
         break;
