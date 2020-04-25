@@ -1,405 +1,537 @@
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ESP8266 library for thermal printers such as the Adafruit Mini Thermal Receipt
+    Printer or the Sparkfun Thermal Printer. Supports printing text with different
+    fonts, printing bitmaps from a custom file type obtained via HTTP or stored 
+    locally as a file.
+
+    Hardware requirements:
+		-RX pin of printer connected to GPIO2
+		-DTR_pin pin of printer connected to any GPIO pin
+		-Known printer baud_rate rate (higher is better for printing bitmaps)
+
+    To use, initialize a Thermal_Printer object. Print using print_... functions.
+
+    Created by Silviu Toderita in 2020.
+    silviu.toderita@gmail.com
+    silviutoderita.com
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "Thermal_Printer.h"
 
-static voidFuncPtr _PrintCallback;
+static voidFuncPtr _print_callback; //Callback function when printing
 
-Thermal_Printer::Thermal_Printer(uint32_t baudIn, uint8_t DTRin, bool port2In){
-    baud = baudIn;
-    DTR = DTRin;
-    port2 = port2In;
+uint32_t baud_rate; //Baud rate of printer
+uint8_t DTR_pin; //ESP8266 pin to use to detect DTR
+
+uint8_t printMode = 0; //printMode byte holds inverse, double height, double width, and bold font status
+ 
+bool suppressed = false; //When printer is suppressed, it won't print but callback will still be called
+
+/*  Thermal_Printer constructor
+    baud_rate_in: Baud rate of printer, usually 9600 or 19200 but can go as high 
+    as 115200.
+    DTR_pin_in: ESP8266 pin that DTR pin of printer is connected to.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+Thermal_Printer::Thermal_Printer(uint32_t baud_rate_in, uint8_t DTR_pin_in){
+    baud_rate = baud_rate_in;
+    DTR_pin = DTR_pin_in;
 }
 
-Thermal_Printer::Thermal_Printer(uint32_t baudIn, uint8_t DTRin){
-    Thermal_Printer(baudIn, DTRin, false);
+/*	begin: Starts the printer, should be called during setup before printing.
+      	print_callback: Callback function to be called anytime printing happens, 
+        that should accept a single String arg.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::begin(voidFuncPtr print_callback){
+	//Begin the serial connection to the printer after a 100ms delay to allow for OTA update serial garbage to finish
+	delay(100);
+	Serial.begin(baud_rate);
+	Serial.set_tx(2); //Set the TX port to GPIO2
+	
+	//Wake the printer
+	delay(500); 
+	wake();
+	write_bytes(ASCII_ESC, '@'); // Initialize printer
+
+	//Set default printing parameters
+	set_printing_parameters(11, 100, 60);
+	set_printing_density(10, 2);
+
+	//Set DTR pin and enable printer flow control
+	pinMode(DTR_pin, INPUT_PULLUP);
+	write_bytes(ASCII_GS, 'a', (1 << 5));
+
+	//Set the print callback
+	_print_callback = print_callback;
 }
 
-void Thermal_Printer::begin(voidFuncPtr PrintCallback){
-    //Begin the serial connection to the printer
-    delay(100);
-    Serial.begin(baud);
-    if(port2){
-      Serial.set_tx(2);
+/*	begin: Starts the printer, should be called during setup before printing. No 
+      	printer callback defined. 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::begin(){
+  	begin(NULL);
+}
+
+/*	set_printing_parameters
+		heating_dots: (0-47) Maximum number of heating dots to fire simultaneously 
+			from 8-384. Default is 11. Higher = faster print speed, higher current 
+			draw.
+		heating_time: (3-255) Amount of time to heat each line (x10uS). Default is 
+			100. Higher = darker print, slower print, possibility of sticking paper.
+		heating_interval: (0-255) Amount of time between heating each line (x10uS). 
+			Default is 60. Higher = Clearer print, slower print speed, less current 
+			draw.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::set_printing_parameters(uint8_t heating_dots, uint8_t heating_time, uint8_t heating_interval){
+	write_bytes(ASCII_ESC, '7');
+	write_bytes(heating_dots, heating_time, heating_interval);
+}
+
+/*	set_printing_density
+		print_density: (0-31) Printing density (50% + printing_density x 5%), can go
+			over 100%. Default is 10. Higher = denser print, but can get 
+			oversaturated.
+		print_break_time: (0-7) Printing break time (x250uS). Default is 2.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::set_printing_density(uint8_t print_density, uint8_t print_break_time){
+  	write_bytes(ASCII_DC2, '#', (print_break_time << 5) | print_density);
+}
+
+/*	offline: Turns off the printer, to be called before a function that might spit
+      	out serial garbage like the start of an OTA update.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::offline(){
+	wake();
+	write_bytes(ASCII_ESC, '=', 0);
+}
+
+/*	suppress: Suppresses all printing, but still calls callback function when
+		printing. 
+		suppressed_in: Set suppressed status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::suppress(bool suppressed_in){
+    suppressed = suppressed_in;
+}
+
+
+/*	feed: Advance the paper roll.
+      	feed_amount: Amount of lines to advance the paper roll by. 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::feed(uint8_t feed_amount){
+    if(!suppressed){
+      	write_bytes(ASCII_ESC, 'd', feed_amount);
     }
     
-    delay(500);
+    //Print blank lines to the console
+    for(int i = 0; i < feed_amount; i++){ 
+      	_print_callback(" ");
+    }
+}
+
+/*	print_status: print small text
+		text: text to print
+		feed_amount: Amount to feed after text
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_status(String text, uint8_t feed_amount){
     wake();
-    writeBytes(ASCII_ESC, '@'); // Init command
+    font_center(false);
+    font_inverse(false);
+    font_double_height(false);
+    font_double_width(false);
+    font_bold(true);
 
-    // ESC 7 n1 n2 n3 Setting Control Parameter Command
-    // n1 = "max heating dots" 0-255 -- max number of thermal print head
-    //      elements that will fire simultaneously.  Units = 8 dots (minus 1).
-    //      Printer default is 7 (64 dots, or 1/6 of 384-dot width), this code
-    //      sets it to 11 (96 dots, or 1/4 of width).
-    // n2 = "heating time" 3-255 -- duration that heating dots are fired.
-    //      Units = 10 us.  Printer default is 80 (800 us), this code sets it
-    //      to value passed (default 120, or 1.2 ms -- a little longer than
-    //      the default because we've increased the max heating dots).
-    // n3 = "heating interval" 0-255 -- recovery time between groups of
-    //      heating dots on line; possibly a function of power supply.
-    //      Units = 10 us.  Printer default is 2 (20 us), this code sets it
-    //      to 40 (throttled back due to 2A supply).
-    // More heating dots = more peak current, but faster printing speed.
-    // More heating time = darker print, but slower printing speed and
-    // possibly paper 'stiction'.  More heating interval = clearer print,
-    // but slower printing speed.
+    output(wrap(text, 32));
+    feed(feed_amount);
+    sleep();
 
-    writeBytes(ASCII_ESC, '7');   // Esc 7 (print settings)
-    writeBytes(11, 100, 60); // Heating dots, heat time, heat interval
-
-    // Print density description from manual:
-    // DC2 # n Set printing density
-    // D4..D0 of n is used to set the printing density.  Density is
-    // 50% + 5% * n(D4-D0) printing density.
-    // D7..D5 of n is used to set the printing break time.  Break time
-    // is n(D7-D5)*250us.
-    // (Unsure of the default value for either -- not documented)
-
-    #define printDensity   10 // 100% (? can go higher, text is darker but fuzzy)
-    #define printBreakTime  2 // 500 uS
-
-    writeBytes(ASCII_DC2, '#', (printBreakTime << 5) | printDensity);
-
-    pinMode(DTR, INPUT_PULLUP);
-    writeBytes(ASCII_GS, 'a', (1 << 5));
-
-    _PrintCallback = PrintCallback;
 }
 
-void Thermal_Printer::offline(){
-  wake();
-  writeBytes(ASCII_ESC, '=', 0);
+/*	print_title: Print a large, centered white title on a black background
+		text: text to print
+		feed_amount: Amount to feed after text
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_title(String text, uint8_t feed_amount){
+    wake();
+    font_center(true);
+    font_inverse(true);
+    font_double_height(true);
+    font_double_width(true);
+    font_bold(true);
+
+	//If the text is shorter than 14 chars, add a space to either side and print. Otherwise, print it wrapped to 16 chars. 
+	if(text.length() <= 14){
+		output(" " + text + " ");
+	}else{
+		output(wrap(text, 16));
+	}
+
+	feed(feed_amount);
+	sleep();
 }
 
+/*	print_heading: Print large, centered text
+		text: text to print
+		feed_amount: Amount to feed after text
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_heading(String text, uint8_t feed_amount){
+	wake();
+	font_center(true);
+	font_inverse(false);
+	font_double_height(true);
+	font_double_width(false);
+	font_bold(true);
+
+	output(wrap(text, 32));
+	feed(feed_amount);
+	sleep();
+}
+
+/*	print_message: Print large text
+		text: text to print
+		feed_amount: Amount to feed after text
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_message(String text, uint8_t feed_amount){
+	wake();
+	font_center(false);
+	font_inverse(false);
+	font_double_height(true);
+	font_double_width(false);
+	font_bold(true);
+
+	output(wrap(text, 32));
+	feed(feed_amount);
+	sleep();
+}
+
+/*	print_error: Print small white text on black background with the prefix 
+		"ERROR: "
+		text: text to print
+		feed_amount: Amount to feed after text
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_error(String text, uint8_t feed_amount){
+	wake();
+	font_center(false);
+	font_inverse(true);
+	font_double_height(false);
+	font_double_width(false);
+	font_bold(false);
+
+	suppressed = false;
+	output(wrap("ERROR: " + text, 32));
+	feed(feed_amount);
+	sleep();
+}
+
+/*	print_line: Print a solid horizontal line
+		thickness: Thickness in pixels
+		feed_amount: Amount to feed after line
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount){
+	_print_callback("------------------------");
+
+	if(!suppressed){
+		wake();
+		//Write full-width bitmap
+		write_bytes(ASCII_DC2, '*', thickness, 48);
+
+		//Write 48 bytes per line of black pixels
+		for(int i = 0;i<(48*thickness);i++){
+		write_bytes(255);
+		}
+
+		feed(feed_amount);
+		sleep();
+	}
+}
+
+/*	print_bitmap_file: Print a bitmap from a file
+		file: The file to read from. First byte is height in pixels x 128, second 
+			byte is height (ie. 192 pixel height will be 1, 64). Starting from third 
+			byte, 1-bit bitmap with each byte being MSB. Width must be exactly 384 to
+			match printer width.
+		feed_amount: Amount to feed after image.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount){
+	uint16_t height = file.read() * 128; //First byte is height * 128
+	height += file.read(); //Second byte is more height
+
+	//While there are still lines to print
+	while(height != 0){
+		//Print up to 255 lines per chunk
+		uint8_t chunk_height = 255;
+		//If there are less than 255 lines left, the chunk will be exactly the height remaining
+		if(height < 255){
+		chunk_height = height;
+		}
+
+		//Write full-width bitmap
+		write_bytes(ASCII_DC2, '*', chunk_height, 48);
+
+		//For each line, write the next 48 bytes
+		for(int i = 0; i < (chunk_height * 48); i++){
+		write_bytes(file.read());
+		}
+
+		//Height remaining = last height remaining - how much we printed this chunk
+		height = height - chunk_height;
+	}
+
+	_print_callback("<IMAGE>");
+
+	feed(feed_amount);
+	sleep();
+
+}
+
+/*	print_bitmap_http: Print a bitmap from web
+		URL: The URL of the file to read from. First byte is height in pixels x 128, 
+			second byte is height (ie. 192 pixel height will be 1, 64). Starting from 
+			third byte, 1-bit bitmap with each byte being MSB. Width must be exactly 
+			384 to match printer width.
+		feed_amount: Amount to feed after image.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::print_bitmap_http(String URL, uint8_t feed_amount){
+	HTTPClient http; //Create a client object
+
+	http.begin(URL); //Begin connection to address
+
+	//Get HTTP code
+	int HTTP_code = http.GET();
+	//If there is any valid HTTP code...
+	if (HTTP_code > 0) {
+
+		//If the HTTP code says there is a file found...
+		if (HTTP_code == HTTP_CODE_OK) {
+
+		// Get TCP stream
+		WiFiClient * stream = http.getStreamPtr();
+
+		wake();
+
+		uint16_t height;
+		uint8_t byte_counter = 0;
+		while(byte_counter < 2){
+			//Wait for a byte to be available
+			while(!stream->available()) yield();
+			//The first byte is height * 128
+			if(byte_counter == 0){
+			height = stream->read() * 128;
+			byte_counter = 1;
+			//The second byte is additional height
+			}else{
+			height += stream->read();
+			byte_counter = 2;
+			}
+			
+		}
+
+		//While there are still lines to print
+		while(height != 0){
+			//Print up to 255 lines per chunk
+			uint8_t chunk_height = 255;
+			//If there are less than 255 lines left, the chunk will be exactly the height remaining
+			if(height < 255){
+			chunk_height = height;
+			}
+
+			//Write full-width bitmap
+			write_bytes(ASCII_DC2, '*', chunk_height, 48);
+
+			//For each line, write the next 48 bytes
+			for(int i = 0; i < (chunk_height * 48); i++){
+			//Wait for a byte to be available
+			while(!stream->available()) yield();
+			//Write the byte
+			write_bytes(stream->read());
+			}
+			//Height remaining = last height remaining - how much we printed this chunk
+			height = height - chunk_height;
+		}
+
+		_print_callback("<IMAGE>");
+
+		feed(feed_amount);
+		sleep();
+
+		}
+	}
+
+	//Close the connection
+	http.end();
+  
+}
+
+/*	(private) wake: Wake up the printer before printing.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::wake() {
-  writeBytes(ASCII_ESC, '8', 0, 0); // Sleep off
-  delay(20);
+	write_bytes(ASCII_ESC, '8', 0, 0);
+	delay(20); //If we don't wait a bit, the printer won't be ready to print
 }
 
-void Thermal_Printer::suppress(bool sup){
-    suppressed = sup;
-}
-
+/*	(private) sleep: Put the printer to sleep after printing.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::sleep() {
-  writeBytes(ASCII_ESC, '8', 5, 5 >> 8);
+  	write_bytes(ASCII_ESC, '8', 5, 5 >> 8);
 }
 
+/*	(private) wait: Check the printer buffer and wait while it's full.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::wait(){
-  while(digitalRead(DTR) == HIGH) yield();
+  	while(digitalRead(DTR_pin) == HIGH) yield();
 }
 
-void Thermal_Printer::writeBytes(uint8_t a) {
+/*	(private) write_bytes: Write instructions as bytes to the printer.
+      	a, b, c, d: Bytes to write.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::write_bytes(uint8_t a) {
     wait();
     Serial.write(a);
 }
-
-void Thermal_Printer::writeBytes(uint8_t a, uint8_t b) {
-  wait();
-  Serial.write(a);
-  Serial.write(b);
+void Thermal_Printer::write_bytes(uint8_t a, uint8_t b) {
+	wait();
+	Serial.write(a);
+	Serial.write(b);
+}
+void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c) {
+	wait();
+	Serial.write(a);
+	Serial.write(b);
+	Serial.write(c);
+}
+void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+	wait();
+	Serial.write(a);
+	Serial.write(b);
+	Serial.write(c);
+	Serial.write(d);
 }
 
-void Thermal_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
-  wait();
-  Serial.write(a);
-  Serial.write(b);
-  Serial.write(c);
-
-}
-
-void Thermal_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
-  wait();
-  Serial.write(a);
-  Serial.write(b);
-  Serial.write(c);
-  Serial.write(d);
-}
-
+/*	(private) output: Write text to the printer.
+      	text: Text to write.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::output(String text){ 
-    
     if(!suppressed){
-      wait();
-      Serial.println(text);
+		wait();
+		Serial.println(text);
     }
-    _PrintCallback(text);
+    _print_callback(text);
 }
 
-void Thermal_Printer::feed(uint8_t x){
-    if(!suppressed){
-      writeBytes(ASCII_ESC, 'd', x);
-    }
-    
-    for(int i = 0; i < x; i++){ //Print timestamps to the console
-      _PrintCallback(" ");
-    }
+/*	(private) wrap: Wrap text.
+		input: String to wrap.
+		wrap_length: Length to wrap string to.
+    RETURNS wrapped string
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+String Thermal_Printer::wrap(String input, uint8_t wrap_length){
+	//No need to wrap text if it's less than the wrap_length
+	if(input.length() < wrap_length){
+		return input;
+	}
+
+	String output = ""; //This holds the output
+	uint8_t char_current_line = 1; //The character currently being processed on this line
+	uint16_t last_space = 0; //The last space processed
+
+	//Run through this code once for each character in the input
+	for(uint16_t i=0; i<input.length(); i++){
+		
+		//If the current character is the 1st in the next line...
+		if(char_current_line == wrap_length + 1){
+		if(input.charAt(i) == ' '){ //If the character is a space, change it to a new line
+			output.setCharAt(i, '\n');
+			char_current_line = 1;
+		}else if(input.charAt(i) == '\n'){ //If the character is a new line, do nothing
+			char_current_line = 1;
+		}else if(last_space <= i - wrap_length){ //If the last space was on the second-last line, this is a really long word and should be split with a new line.
+			output.setCharAt(i, '\n');
+			char_current_line = 1;
+		}else{ //If it's any other situation, change the last space to a new line and record the current character being processed on this line
+			output.setCharAt(last_space, '\n');
+			char_current_line = i - last_space;
+		}
+		}
+
+		if(input.charAt(i) == ' '){ //If this character is a space, record it
+		last_space = i;
+		}
+
+		//If this character is a new line, reset the char_current_line counter
+		if(input.charAt(i) == '\n'){
+		char_current_line = 1;
+		}
+
+		output += input.charAt(i); //Append the current character to the output string
+		char_current_line++; //Increment the char_current_line coutner
+	}
+
+	return output;
 }
 
-//Wrap text to a specified amount of characters
-String Thermal_Printer::wrap(String input, uint8_t wrapLength){
-
-  //No need to wrap text if it's less than the wrapLength
-  if(input.length() < wrapLength){
-    return input;
-  }
-
-  String output = ""; //This holds the output
-  uint8_t charThisLine = 1; //The character we're at on this line
-  uint16_t lastSpace = 0; //The last space we processed
-
-  //Run through this code once for each character in the input
-  for(uint16_t i=0; i<input.length(); i++){
-    
-    
-    if(charThisLine == 33){ //Once we reach the 33rd character in a line
-      if(input.charAt(i) == ' '){ //If the character is a space, change it to a new line
-        output.setCharAt(i, '\n');
-        charThisLine = 1;
-      }else if(input.charAt(i) == '\n'){ //If the character is a new line, do nothing
-        charThisLine = 1;
-      }else if(lastSpace <= i - wrapLength){ //If the last space was on the previous line, we're dealing with a really long word. Add a new line. 
-        output.setCharAt(i, '\n');
-        charThisLine = 1;
-      }else{ //If it's any other situation, we change the last space to a new line and record which character we're at on the next line
-        output.setCharAt(lastSpace, '\n');
-        charThisLine = i - lastSpace;
-      }
-    }
-
-    if(input.charAt(i) == ' '){ //If this character is a space, record it
-      lastSpace = i;
-    }
-
-    if(input.charAt(i) == '\n'){
-      charThisLine = 1;
-    }
-
-    output += input.charAt(i); //Append the current character to the output string
-    charThisLine++; //Record that we're on the next character on this line
-  }
-
-  return output;
-}
-
-void Thermal_Printer::center(bool on){
+/*	(private) font_center:
+      on: Center the font on/off
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::font_center(bool on){
     if(on){
-        writeBytes(ASCII_ESC, 'a', 1); 
+        write_bytes(ASCII_ESC, 'a', 1); 
     }else{
-        writeBytes(ASCII_ESC, 'a', 0); 
+        write_bytes(ASCII_ESC, 'a', 0); 
     }  
 }
 
-void Thermal_Printer::inverse(bool on){
+/*	(private) font_inverse:
+      	on: Print white on black on/off
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::font_inverse(bool on){
     if(on){
-        writeBytes(ASCII_GS, 'B', 1); 
+        write_bytes(ASCII_GS, 'B', 1); 
     }else{
-        writeBytes(ASCII_GS, 'B', 0); 
+        write_bytes(ASCII_GS, 'B', 0); 
     }  
 
-    writePrintMode();
+    font_write_print_mode();
 
 }
 
-void Thermal_Printer::doubleHeight(bool on){
+/*	(private) font_double_height:
+      	on: Set double height font on/off
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::font_double_height(bool on){
     if(on){
         printMode |= (1<<4);
     }else{
         printMode &= ~(1<<4);
     }  
 
-    writePrintMode();
+    font_write_print_mode();
 }
 
-void Thermal_Printer::doubleWidth(bool on){
+/*	(private) font_double_width:
+      	on: Set double width font on/off
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::font_double_width(bool on){
     if(on){
         printMode |= (1<<5);
     }else{
         printMode &= ~(1<<5);
     }  
 
-    writePrintMode();
+    font_write_print_mode();
 }
 
-void Thermal_Printer::bold(bool on){
+/*	(private) font_bold:
+     	on: Set font bold on/off
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::font_bold(bool on){
     if(on){
         printMode |= (1<<3);
     }else{
         printMode &= ~(1<<3);
     }  
 
-    writePrintMode();
+    font_write_print_mode();
 }
 
-void Thermal_Printer::writePrintMode() {
-  writeBytes(ASCII_ESC, '!', printMode);
-}
-
-void Thermal_Printer::printStatus(String text, uint8_t feedAmt){
-    wake();
-    center(false);
-    inverse(false);
-    doubleHeight(false);
-    doubleWidth(false);
-    bold(true);
-
-    output(wrap(text, 32));
-    feed(feedAmt);
-    sleep();
-
-}
-
-//Print a centered, large, bold, inverse title
-void Thermal_Printer::printTitle(String text, uint8_t feedAmt){
-    wake();
-    center(true);
-    inverse(true);
-    doubleHeight(true);
-    doubleWidth(true);
-    bold(true);
-
-  //If the text is shorter than 14 chars, add a space to either side and print. Otherwise, just print it. 
-  if(text.length() <= 14){
-    output(" " + text + " ");
-  }else{
-    output(wrap(text, 16));
-  }
-
-  feed(feedAmt);
-  sleep();
-}
-
-//Print a centered, bold, medium heading
-void Thermal_Printer::printHeading(String text, uint8_t feedAmt){
-  wake();
-  center(true);
-  inverse(false);
-  doubleHeight(true);
-  doubleWidth(false);
-  bold(true);
-
-  output(wrap(text, 32));
-  feed(feedAmt);
-  sleep();
-
-}
-
-void Thermal_Printer::printMessage(String text, uint8_t feedAmt){
-  wake();
-  center(false);
-  inverse(false);
-  doubleHeight(true);
-  doubleWidth(false);
-  bold(true);
-
-  output(wrap(text, 32));
-  feed(feedAmt);
-  sleep();
-}
-
-void Thermal_Printer::printError(String text, uint8_t feedAmt){
-  wake();
-  center(false);
-  inverse(true);
-  doubleHeight(false);
-  doubleWidth(false);
-  bold(false);
-
-  suppressed = false;
-  output(wrap("ERROR: " + text, 32));
-  feed(feedAmt);
-  sleep();
-
-}
-
-//Print a dotted line
-void Thermal_Printer::printLine(uint8_t thick, uint8_t feedAmt){
-  _PrintCallback("------------------------");
-
-  if(!suppressed){
-    wake();
-    writeBytes(ASCII_DC2, '*', thick, 48);
-
-    for(int i = 0;i<(48*thick);i++){
-      writeBytes(255);
-    }
-
-    feed(feedAmt);
-    sleep();
-  }
-
-}
-
-void Thermal_Printer::printBitmap(const char* URL, uint8_t feedAmt){
-  
-  HTTPClient http;
-
-  // Configure server and url
-  http.begin(URL);
-
-  // Start connection and send HTTP header
-  int httpCode = http.GET();
-  if (httpCode > 0) {
-
-    // File found at server
-    if (httpCode == HTTP_CODE_OK) {
-
-      // Get tcp stream
-      WiFiClient * stream = http.getStreamPtr();
-
-      wake();
-
-      // Read all data from server
-      while (http.connected()) {
-
-        uint16_t width;
-        uint16_t height;
-
-        uint8_t byteCounter = 0;
-        while(byteCounter < 4){
-          while(!stream->available()) yield();
-          if(byteCounter == 0){
-            width = stream->read() * 128;
-            byteCounter = 1;
-          }else if(byteCounter == 1){
-            width += stream->read();
-            byteCounter = 2;
-          }else if(byteCounter == 2){
-            height = stream->read() * 128;
-            byteCounter = 3;
-          }else{
-            height += stream->read();
-            byteCounter = 4;
-          }
-          
-        }
-
-        uint8_t widthBytes = width / 8;
-
-        while(height != 0){
-          uint8_t chunkHeight = 192;
-          if(height < 192){
-            chunkHeight = height;
-          }
-
-          writeBytes(ASCII_DC2, '*', chunkHeight, widthBytes);
-
-          for(int i = 0; i < (chunkHeight * widthBytes); i++){
-            while(!stream->available()) yield();
-            writeBytes(stream->read());
-          }
-
-          height = height - chunkHeight;
-        }
-
-
-        yield();
-      }
-
-      _PrintCallback("<IMAGE>");
-
-      feed(feedAmt);
-      sleep();
-
-    }
-  }
-
-  http.end();
-  
+/*	(private) font_write_print_mode: Sets the print mode for inverse, double
+      	height, double width, and bold font. 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::font_write_print_mode() {
+  	write_bytes(ASCII_ESC, '!', printMode);
 }

@@ -15,7 +15,7 @@
 
 
 NTP_Clock ntp_clock; //Create an NTP object
-Thermal_Printer printer(115200, D7, true); //Create a printer object
+Thermal_Printer printer(115200, D7); //Create a printer object
 WiFiManager wifiManager(10000); //Create a WiFi Manager object with a 10 second connection timeout
 WebInterface webInterface; //Create a Web Interface Object
 Storage phoneBook("phoneBook", 32); //Create a storage object for the phone book
@@ -129,13 +129,13 @@ void processMessage(String time, String from, String message, String media){
     name = "(" + from.substring(1, 4) + ") " + from.substring(4, 7) + " - " + from.substring(7,11);
   }
 
-  if(!photo) printer.printTitle("MESSAGE", 1); //Print a heading
+  if(!photo) printer.print_title("MESSAGE", 1); //Print a heading
 
-  if(!photo) printer.printStatus(ntp_clock.get_date_time(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
+  if(!photo) printer.print_status(ntp_clock.get_date_time(time.toInt()), 0); //Convert Twilio's date/time to a long timestamp and print it
 
-  if(!photo) printer.printStatus("From: " + name, 1);
+  if(!photo) printer.print_status("From: " + name, 1);
 
-  if(!photo) printer.printMessage(message, 1); //Print the message
+  if(!photo) printer.print_message(message, 1); //Print the message
 
   if(media != "0"){
     uint8_t mediaCount = 1;
@@ -150,11 +150,10 @@ void processMessage(String time, String from, String message, String media){
 
     for(uint8_t i = 0; i < mediaCount; i++){
       if(mediaNum[i] == "NS"){
-        printer.printMessage("<UNSUPPORTED ATTACHMENT>", 1);
+        printer.print_message("<UNSUPPORTED ATTACHMENT>", 1);
         twilio.send_message(from, "+16043739569", "Sorry " + name + ", but your message contained media in a format that's not supported. Only .jpg, .png, and .gif images are supported.");
       }else{
-        const char* URL = "http://silviutoderita.com/img/";
-        printer.printBitmap(URL, 1);
+        printer.print_bitmap_http("http://silviutoderita.com/img/" + mediaNum[i] + ".bbf", 1);
       }
       
     }
@@ -162,7 +161,7 @@ void processMessage(String time, String from, String message, String media){
   }
 
   
-  if(!photo)printer.printLine(4, 4); //Print a line
+  if(!photo)printer.print_line(4, 4); //Print a line
 
 }
 
@@ -187,8 +186,8 @@ void newMessage(char* topic, byte* payload, unsigned int length){
 
 //Set the WiFiManager status to idle to acknowledge that we've processed the disconnection
 void setIdle(){
-  printer.printStatus("Searching for Networks...", 1);
-  printer.printHeading("<-- Press Button to Start Hotspot", 3);
+  printer.print_status("Searching for Networks...", 1);
+  printer.print_heading("<-- Press Button to Start Hotspot", 3);
   wifiManager.setIdle();
 }
 
@@ -196,14 +195,14 @@ void setIdle(){
 void createHotspot(){
   //If we can successfully create a hotspot, output the details
   if(wifiManager.createHotspot(deviceName, devicePassword)){
-    printer.printStatus("Hotspot Started! ", 0);
-    printer.printStatus("Network: " + String(deviceName), 0);
-    printer.printStatus("Password: " + String(devicePassword), 1);
-    printer.printHeading("<-- Press Button to Stop Hotspot", 3);
+    printer.print_status("Hotspot Started! ", 0);
+    printer.print_status("Network: " + String(deviceName), 0);
+    printer.print_status("Password: " + String(devicePassword), 1);
+    printer.print_heading("<-- Press Button to Stop Hotspot", 3);
   //If we can't create a hotspot, output an error
   }else{
-    printer.printError("Unable to Initialize Hotspot!", 0); //Output an error if we can't create the hotspot (not sure when this would ever happen)
-    printer.printHeading("<-- Press Button to Retry", 3);
+    printer.print_error("Unable to Initialize Hotspot!", 0); //Output an error if we can't create the hotspot (not sure when this would ever happen)
+    printer.print_heading("<-- Press Button to Retry", 3);
   }
 }
 
@@ -222,22 +221,22 @@ bool connectMQTT(){
 
 //Set the WiFiManager status to connected to acknowledge that we've processed the connection
 void connected(){
-  printer.printStatus("WiFi Connected: " + wifiManager.SSID(), 0); //Output the network
+  printer.print_status("WiFi Connected: " + wifiManager.SSID(), 0); //Output the network
 
   //Attempt to connect to the NTP server for 2 seconds
   if(ntp_clock.begin()){
-    printer.printStatus(ntp_clock.get_date_time(), true); //Print a timestamp if it succeeds
+    printer.print_status(ntp_clock.get_date_time(), true); //Print a timestamp if it succeeds
   }else{
-    printer.printError("Unable to Connect To Time Server!", 1); //Print an error if it fails
+    printer.print_error("Unable to Connect To Time Server!", 1); //Print an error if it fails
   }
   
   wifiManager.setConnected(); //Let the wifiManager object know we have acknowledged a connection
 
   if(connectMQTT()){
-    printer.printHeading("Ready to Receive Messages!\n(604) 373 - 9569", 1);
+    printer.print_heading("Ready to Receive Messages!\n(604) 373 - 9569", 1);
   }
 
-  printer.printLine(4, 4);
+  printer.print_line(4, 4);
 
   printer.suppress(false); //If we just did an OTA update and printing was inhibited, now printing is re-enabled
 
@@ -299,7 +298,7 @@ void setup() {
   } 
 
   //Print the title
-  printer.printTitle("FAX MACHINE", 2);
+  printer.print_title("FAX MACHINE", 2);
 
   //Add the network to the WiFi Manager
   wifiManager.addNetwork((char*)"Azaviu 2.4GHz", (char*)"sebastian");
@@ -310,9 +309,9 @@ void setup() {
   
   //If we can't establish a WiFi connection in the alloted timeout, print an error
   if(!wifiManager.begin()){
-    printer.printError("Unable to Find Known Networks!", 0);  
-    printer.printStatus("Searching for Networks...", 1);
-    printer.printHeading("<-- Press Button to Start Hotspot", 3);
+    printer.print_error("Unable to Find Known Networks!", 0);  
+    printer.print_status("Searching for Networks...", 1);
+    printer.print_heading("<-- Press Button to Start Hotspot", 3);
   }
 
 }
@@ -349,7 +348,7 @@ void loop() {
 
     //WM_CONNECTION_FAILED indicates we have failed to connect to a network
     case WM_CONNECTION_FAILED:
-        printer.printError("Unable to Connect To Network!", 0);  
+        printer.print_error("Unable to Connect To Network!", 0);  
         setIdle(); //Set the status to Idle
         break;
 
@@ -369,8 +368,8 @@ void loop() {
 
     //WM_CONNECTION_LOST indicates we have just lost the wi-fi connection
     case WM_CONNECTION_LOST:
-        printer.printStatus(ntp_clock.get_timestamp(), true); //Print the time and an error
-        printer.printError("Lost WiFi Connection!", 0);
+        printer.print_status(ntp_clock.get_timestamp(), true); //Print the time and an error
+        printer.print_error("Lost WiFi Connection!", 0);
         setIdle(); //Set the status to idle
         break;
 
