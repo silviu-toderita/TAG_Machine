@@ -30,7 +30,9 @@ uint64_t last_request_millis = 0; //Time of last NTP request
 uint64_t last_response_millis; //Time of last NTP response
 uint32_t time_at_last_response = 0; //UNIX Time at last NTP response
 
-int16_t timezone_offset; //Offset from UTC in hours
+int16_t timezone_offset = 0; //Offset from UTC in minutes
+
+bool valid_timezone = true;
 
 uint32_t external_UNIX_time = 0;
 
@@ -82,22 +84,27 @@ uint32_t NTP_Clock::get_UNIX_time(){
 /*  handle: Should be run as often as possible, preferably in 
     every loop. Checks if UDP packet should be sent and if UDP 
     packet has been received.
-    RETURNS 
-        True if there is a valid time
-        False if there is not a valid time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool NTP_Clock::handle(){ 
+void NTP_Clock::handle(){ 
+    //If there is no time yet, the interval is 3s. Otherwise the interval is normal. 
     uint32_t interval;
-
-    //If we've not received any time yet, the interval is 2s. Otherwise the interval is normal. 
     if(time_at_last_response == 0){ 
-        interval = 2000;
+        interval = 3000;
     }else{
         interval = request_interval * 1000;
     }
 
-    //If there is no IP address for the timeserver, get one
+    //If there is no IP address for the timeserver, attempt to get one
     if(!server_address_IP) WiFi.hostByName(server_address, server_address_IP);
+
+    //If there is no valid timezone, attempt to get one
+    if(!valid_timezone){
+        uint16_t timezone = get_timezone();
+        if(timezone != -1){
+            timezone_offset = timezone;
+            valid_timezone = true;
+        }
+    }
     
     //If it's been more than the interval since the last NTP Request, send another.
     if(millis() - last_request_millis > interval){ 
@@ -112,9 +119,14 @@ bool NTP_Clock::handle(){
         time_at_last_response = NTP_time - 2208988800UL + timezone_offset*60; //Convert NTP time to UNIX Time, and take into account time zone
         last_response_millis = millis(); //Update the time of last NTP response
     }
+}
 
-    if(!time_at_last_response) return false; //If there is no time yet, return false
-    return true; //If there is a time, return true
+/*  status:
+    RETURNS True if there is a valid time, false if not.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+bool NTP_Clock::status(){
+    if(!time_at_last_response || !valid_timezone) return false;
+    return true;
 }
 
 /*  begin: Should be run after a network connection is 
@@ -126,6 +138,8 @@ bool NTP_Clock::handle(){
         False if there is not a valid time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool NTP_Clock::begin(uint32_t timeout, int16_t timezone){ 
+    if(status()) return true;
+
     timezone_offset = timezone;
     
     UDP.begin(123); //Begin UDP connection
@@ -133,7 +147,8 @@ bool NTP_Clock::begin(uint32_t timeout, int16_t timezone){
     //Try and get initial time within the specified timeout. If that fails, return false. 
     uint32_t start = millis();
     while(millis() < start + timeout){
-        if(handle()) return true;
+        handle();
+        if(status()) return true;
         yield();
     }
 
@@ -145,14 +160,16 @@ bool NTP_Clock::begin(uint32_t timeout, int16_t timezone){
         timeout: 3 seconds
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool NTP_Clock::begin(){
-    //Try and get the timezone up to 3 times before giving up and using PST
+    if(status()) return true;
+    //Try and get the timezone
     int16_t timezone = get_timezone();
-    if(timezone == -1)  timezone = get_timezone();
-    if(timezone == -1)  timezone = get_timezone();
-    if(timezone == -1)  timezone = -420;
+    //If there is no valid timezone, change the valid_timezone flag
+    if(timezone == -1){
+        valid_timezone = false;
+    }  
 
-    //Run begin function with a timeout of 3s
-    return begin(3000, timezone);
+    //Run begin function with a timeout of 5s
+    return begin(5000, timezone);
 }
 
 /*  get_timezone
@@ -160,6 +177,7 @@ bool NTP_Clock::begin(){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 int16_t NTP_Clock::get_timezone(){
     WiFiClient client; //Create a client object
+    client.setTimeout(3000);
     //If we can connect to the URL...
     if(client.connect("worldtimeapi.org", 80)){
         //Send a request for the current timezone based on our IP
@@ -431,8 +449,7 @@ String NTP_Clock::get_minute(bool add_zero){
     return String(minute);
 }
 
-/*
-    get_second
+/*  get_second
         add_zero: Add a zero before single-digit number
     RETURNS currrent second
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -453,7 +470,7 @@ String NTP_Clock::get_second(bool add_zero){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String NTP_Clock::get_date_time(){
     //If current time is unknown, return blank date_time
-    if(!handle()) return "### ### ##, #### - ##:####";
+    if(!status()) return "### ### ##, #### - ##:####";
 
     return get_day_of_week(true) + " " + get_month_text(true) + " " + get_day_of_month(false) + ", " + String(get_year()) + " - " + get_hour(false, false) + ":" + get_minute(true) + get_AM_PM();
 }
@@ -480,7 +497,7 @@ String NTP_Clock::get_date_time(uint32_t external_time){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String NTP_Clock::get_timestamp(){
     //If time is unknown, return a blank timestamp
-    if(!handle()) return "####/##/##-##:##:##";
+    if(!status()) return "####/##/##-##:##:##";
     
     return String(get_year()) + "/" + get_month_number(true) + "/" + get_day_of_month(true) + "-" + get_hour(true, true) + ":" + get_minute(true) + ":" + get_second(true);
 }

@@ -42,18 +42,18 @@ Thermal_Printer::Thermal_Printer(uint32_t baud_rate_in, uint8_t DTR_pin_in){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::begin(voidFuncPtr print_callback){
 	//Begin the serial connection to the printer after a 100ms delay to allow for OTA update serial garbage to finish
-	delay(100);
+	delay(150);
 	Serial.begin(baud_rate);
 	Serial.set_tx(2); //Set the TX port to GPIO2
 	
 	//Wake the printer
-	delay(500); 
+	delay(350); 
 	wake();
 	write_bytes(ASCII_ESC, '@'); // Initialize printer
 
 	//Set default printing parameters
-	set_printing_parameters(11, 100, 60);
-	set_printing_density(10, 2);
+	set_printing_parameters(13, 180, 100);
+	set_printing_density(12, 2);
 
 	//Set DTR pin and enable printer flow control
 	pinMode(DTR_pin, INPUT_PULLUP);
@@ -243,14 +243,14 @@ void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount){
 }
 
 /*	print_bitmap_file: Print a bitmap from a file
-		file: The file to read from. First byte is height in pixels x 128, second 
-			byte is height (ie. 192 pixel height will be 1, 64). Starting from third 
+		file: The file to read from. First byte is height in pixels x 256, second 
+			byte is height (ie. 384 pixel height will be 1, 128). Starting from third 
 			byte, 1-bit bitmap with each byte being MSB. Width must be exactly 384 to
 			match printer width.
 		feed_amount: Amount to feed after image.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount){
-	uint16_t height = file.read() * 128; //First byte is height * 128
+	uint16_t height = file.read() * 256; //First byte is height * 256
 	height += file.read(); //Second byte is more height
 
 	//While there are still lines to print
@@ -282,8 +282,8 @@ void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount){
 }
 
 /*	print_bitmap_http: Print a bitmap from web
-		URL: The URL of the file to read from. First byte is height in pixels x 128, 
-			second byte is height (ie. 192 pixel height will be 1, 64). Starting from 
+		URL: The URL of the file to read from. First byte is height in pixels x 256, 
+			second byte is height (ie. 384 pixel height will be 1, 128). Starting from 
 			third byte, 1-bit bitmap with each byte being MSB. Width must be exactly 
 			384 to match printer width.
 		feed_amount: Amount to feed after image.
@@ -311,9 +311,9 @@ void Thermal_Printer::print_bitmap_http(String URL, uint8_t feed_amount){
 		while(byte_counter < 2){
 			//Wait for a byte to be available
 			while(!stream->available()) yield();
-			//The first byte is height * 128
+			//The first byte is height * 256
 			if(byte_counter == 0){
-			height = stream->read() * 128;
+			height = stream->read() * 256;
 			byte_counter = 1;
 			//The second byte is additional height
 			}else{

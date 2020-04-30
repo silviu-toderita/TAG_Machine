@@ -21,8 +21,11 @@ class NTP_Clock{
         NTP_Clock(char*, uint16_t);
         NTP_Clock();
 
+        void
+            handle();
+
         bool 
-            handle(),
+            status(),
             begin(uint32_t, int16_t),
             begin();
 
