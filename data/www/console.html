@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang=en>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink_to_fit=no">
+
+        <title> TAG Machine </title>
+
+        <!--Load Bootstrap-->
+        <link rel='stylesheet' href='lib/bs.css'>
+        <!--Load jQuery-->
+        <script src="lib/jq.js"></script>
+        <!--Load Bootstrap Javascript (includes Popper)-->
+        <script src="lib/bs.js"></script>
+
+        <!--Javascript-->
+        <script>
+            //Websocket function, automatically retries connecting 1 second after error or connection closed
+            function connect(){
+                //Create a websocket connection
+                var connection = new WebSocket('ws://' + location.hostname + ':81/', ['arduino']);
+
+                //When a new websocket message is received, append it to the console textarea and scroll to the bottom
+                connection.onmessage = function (mess) {
+                    document.getElementById("console").append(mess.data);
+                    $('#console').scrollTop($('#console')[0].scrollHeight);
+                };
+
+                //If the connection closes, attempt to reconnect in 1 second
+                connection.onclose = function(e){
+                    setTimeout(function(){
+                        connect();
+                    }, 1000);
+                };
+
+                //If there is a connection error, close the connection and restart
+                connection.onerror = function(err){
+                    connection.close();
+                };
+            }
+
+            //Connect to websocket server upon pageload
+            window.onload = function(){
+                connect();
+            }
+            
+            //Load the navbar
+            $.get("nav.html", function(data){
+                $("#navigation").replaceWith(data);
+            });
+
+        </script>
+
+    </head>
+
+    <body>
+        <!--Navbar-->
+        <div id="navigation"></div>
+
+        <!--Main container with a viewport height of 65%-->
+        <main class="container" style="height: 65vh">
+            <header class="page-header header container">
+                <h2>Console</h2>
+            </header>
+            
+            <!--Console text area-->
+            <div class="h-100 form-group">
+                <textarea class="h-100 form-control" id="console"></textarea>
+            </div>
+        </main>
+        
+
+    </body>
+</html> 

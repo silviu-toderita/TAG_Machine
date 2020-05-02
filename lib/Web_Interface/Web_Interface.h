@@ -3,7 +3,7 @@
 class Web_Interface{
     public:
     
-        Web_Interface();
+        Web_Interface(bool);
     
         void 
             handle(),

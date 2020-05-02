@@ -14,11 +14,12 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 #include "Arduino.h"
+#define NTP_CLOCK_AUTO -1
 
 class NTP_Clock{
     public:
 
-        NTP_Clock(char*, uint16_t);
+        NTP_Clock(char*, uint16_t, int16_t);
         NTP_Clock();
 
         void
@@ -26,15 +27,13 @@ class NTP_Clock{
 
         bool 
             status(),
-            begin(uint32_t, int16_t),
-            begin();
+            begin(uint32_t),
+            begin(),
+            get_timezone();
 
         uint16_t 
             get_year();
-            
-        int16_t
-            get_timezone();
-
+    
         String 
             get_month_number(bool),
             get_month_text(bool),

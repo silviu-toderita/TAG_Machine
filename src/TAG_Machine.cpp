@@ -28,7 +28,7 @@
 Persistent_Storage phone_book("phone_book"); //Storage object for the phone book
 
 WiFi_Manager WiFi_manager(10000); //WiFi Manager object with a 10 second connection timeout
-Web_Interface web_interface; //Web Interface Object
+Web_Interface web_interface(false); //Web Interface Object with console_persist set to false
 NTP_Clock NTP_clock; //NTP object
 
 WiFiClient ESP_client; //Generic Client object for MQTT client
@@ -64,7 +64,10 @@ void console_print(String input, bool printed){
     //Append the input to the output, then replace every new line with the prefix.
     output += input;
     output.replace("\n","\n" + prefix); 
-    
+
+    //Add a new line to the end of the output
+    output += "\n";
+
     //Print the text
     web_interface.console_print(output); 
 }
@@ -252,24 +255,30 @@ bool connect_to_MQTT(){
     //Set callback for incoming message
     MQTT_client.setCallback(new_message);
 
-    //Attempt to connect to the MQTT server with clean-session turned off
-    if(MQTT_client.connect("tag-machine",NULL,NULL,"fax",0,false,"disconnect",false)){
-        //If successful, subscribe to the topic for the phone number at a QoS of 1
-        MQTT_client.subscribe("smsin-16043739569",1);
+    //Attempt to connect twice before giving up
+    uint8_t attempt_counter = 0;
+    while(!MQTT_client.connected() && attempt_counter < 2){
+        attempt_counter++;
+        //Attempt to connect to the MQTT server with clean-session turned off
+        if(MQTT_client.connect("tag-machine",NULL,NULL,"fax",0,false,"disconnect",false)){
+            //If successful, subscribe to the topic for the phone number at a QoS of 1
+            MQTT_client.subscribe("smsin-16043739569",1);
 
-        //Attempt to connect to the NTP server
-        if(NTP_clock.status()){
-            printer.print_status(NTP_clock.get_date_time(), 1); //Print a timestamp if it succeeds
-        }else{
-            printer.feed(1);
+            //Attempt to connect to the NTP server
+            if(NTP_clock.status()){
+                printer.print_status(NTP_clock.get_date_time(), 1); //Print a timestamp if it succeeds
+            }else{
+                printer.feed(1);
+            }
+
+            //Print that messages can now be received
+            printer.print_heading("Ready to Receive Messages!\n(604) 373 - 9569", 1);
+            printer.print_line(4, 4); 
+            connected_to_MQTT = true;
+            return true;
         }
-
-        //Print that messages can now be received
-        printer.print_heading("Ready to Receive Messages!\n(604) 373 - 9569", 1);
-        printer.print_line(4, 4); 
-        connected_to_MQTT = true;
-        return true;
     }
+
     return false;
 
 }

@@ -32,26 +32,41 @@ uint32_t time_at_last_response = 0; //UNIX Time at last NTP response
 
 int16_t timezone_offset = 0; //Offset from UTC in minutes
 
-bool valid_timezone = true;
+bool timezone_valid; //Is the current timezone valid
+bool timezone_auto; //Timezone obtained automatically
 
 uint32_t external_UNIX_time = 0;
 
 /*  NTP_Clock Constructor
         server: NTP server address
         interval: NTP Update Interval in seconds
+        timezone: Timezone offset from UTC in minutes (- or +). Can optionally be
+            NTP_CLOCK_AUTO to get automatic timezone
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-NTP_Clock::NTP_Clock(char* server, uint16_t interval){ 
+NTP_Clock::NTP_Clock(char* server, uint16_t interval, int16_t timezone){ 
     server_address = server;
     request_interval = interval;
+    timezone_offset = timezone;
+
+    //If the timezone is automatic, set the valid status to false as it must be obtained later
+    if(timezone == NTP_CLOCK_AUTO){
+        timezone_valid = false;
+        timezone_auto = true;
+    //If a timezone is defined, set validity to true
+    }else{
+        timezone_valid = true;
+        timezone_auto = false;
+        timezone_offset = timezone;
+    }
 }
 
 /*  NTP_Clock Constructor (with defaults)
         server: time.google.com
         interval: 10 minutes
+        timezone: auto
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 NTP_Clock::NTP_Clock(){ 
-    server_address = (char*)"time.google.com";
-    request_interval = 600;
+    NTP_Clock((char*)"time.google.com", 600, NTP_CLOCK_AUTO);
 }
 
 /*  send_NTP_Packet: Send a request packet to the NTP server
@@ -86,10 +101,10 @@ uint32_t NTP_Clock::get_UNIX_time(){
     packet has been received.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void NTP_Clock::handle(){ 
-    //If there is no time yet, the interval is 3s. Otherwise the interval is normal. 
+    //If there is no time yet, attempt to update every 5 seconds. Otherwise the interval is normal. 
     uint32_t interval;
     if(time_at_last_response == 0){ 
-        interval = 3000;
+        interval = 5000;
     }else{
         interval = request_interval * 1000;
     }
@@ -98,11 +113,9 @@ void NTP_Clock::handle(){
     if(!server_address_IP) WiFi.hostByName(server_address, server_address_IP);
 
     //If there is no valid timezone, attempt to get one
-    if(!valid_timezone){
-        uint16_t timezone = get_timezone();
-        if(timezone != -1){
-            timezone_offset = timezone;
-            valid_timezone = true;
+    if(!timezone_valid){
+        if(get_timezone()){
+            timezone_valid = true;
         }
     }
     
@@ -110,6 +123,10 @@ void NTP_Clock::handle(){
     if(millis() - last_request_millis > interval){ 
         last_request_millis = millis();
         send_NTP_packet();
+        //If the timezone offset is 0, there is a high chance that the timezone offset is wrong. Attempt to get another one
+        if(timezone_auto && timezone_offset == 0){
+            get_timezone();
+        }
     }
 
      //If there is any data in the UDP buffer, process it
@@ -125,22 +142,19 @@ void NTP_Clock::handle(){
     RETURNS True if there is a valid time, false if not.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool NTP_Clock::status(){
-    if(!time_at_last_response || !valid_timezone) return false;
+    if(!time_at_last_response) return false;
     return true;
 }
 
 /*  begin: Should be run after a network connection is 
     established. 
         timeout: How long to wait for an initial connection
-        offset: Timezone offset from UTC in minutes (- or +)
     RETURNS 
         True if there is a valid time
         False if there is not a valid time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool NTP_Clock::begin(uint32_t timeout, int16_t timezone){ 
+bool NTP_Clock::begin(uint32_t timeout){ 
     if(status()) return true;
-
-    timezone_offset = timezone;
     
     UDP.begin(123); //Begin UDP connection
 
@@ -157,28 +171,21 @@ bool NTP_Clock::begin(uint32_t timeout, int16_t timezone){
 }
 
 /*  begin (with defaults)
-        timeout: 3 seconds
+        timeout: 5 seconds
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool NTP_Clock::begin(){
-    if(status()) return true;
-    //Try and get the timezone
-    int16_t timezone = get_timezone();
-    //If there is no valid timezone, change the valid_timezone flag
-    if(timezone == -1){
-        valid_timezone = false;
-    }  
-
     //Run begin function with a timeout of 5s
-    return begin(5000, timezone);
+    return begin(5000);
 }
 
-/*  get_timezone
-    RETURNS time offset from UTC in minutes (+ or -)
+/*  get_timezone: Get the timezone from worldtimeAPI.org based on current IP, and
+        save it if successful
+    RETURNS True if successful, false if not
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-int16_t NTP_Clock::get_timezone(){
+bool NTP_Clock::get_timezone(){
     WiFiClient client; //Create a client object
-    client.setTimeout(3000);
-    //If we can connect to the URL...
+    client.setTimeout(5000);
+    //If connection to the URL established...
     if(client.connect("worldtimeapi.org", 80)){
         //Send a request for the current timezone based on our IP
         client.println("GET /api/ip.txt HTTP/1.1\r\nHost: worldtimeapi.org\r\nConnection: close\r\n\r\n");
@@ -194,12 +201,15 @@ int16_t NTP_Clock::get_timezone(){
 
         //Parse response to get utc_offset
         String utc_offset = response.substring(response.indexOf("utc_offset: ") + 12, response.indexOf("\nweek_number:"));
-        //Return utc_offset in minutes
-        return utc_offset.substring(0, 3).toInt() * 60 + utc_offset.substring(4,6).toInt();
-    //If we can't connect to the URL, return -1
-    }else{
-        return -1;
+        //Timezone offset is equal to the hours + minutes of UTC offset
+        timezone_offset = utc_offset.substring(0, 3).toInt() * 60 + utc_offset.substring(4,6).toInt();
+
+        return true;
     }
+
+    //If connection to the URL is not established, return false
+    return false;
+
 }
 
 /*  get_leap_years
@@ -484,7 +494,7 @@ String NTP_Clock::get_date_time(uint32_t external_time){
     //Set external_UNIX_time based on input
     external_UNIX_time = external_time;
     //Get date/time string
-    String date_time = get_date_time();
+    String date_time = get_day_of_week(true) + " " + get_month_text(true) + " " + get_day_of_month(false) + ", " + String(get_year()) + " - " + get_hour(false, false) + ":" + get_minute(true) + get_AM_PM();;
     //Delete external_UNIX_time
     external_UNIX_time = 0;
 

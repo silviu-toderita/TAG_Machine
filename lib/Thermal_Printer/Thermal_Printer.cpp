@@ -52,8 +52,8 @@ void Thermal_Printer::begin(voidFuncPtr print_callback){
 	write_bytes(ASCII_ESC, '@'); // Initialize printer
 
 	//Set default printing parameters
-	set_printing_parameters(13, 180, 100);
-	set_printing_density(12, 2);
+	set_printing_parameters(11, 120, 60);
+	set_printing_density(10, 2);
 
 	//Set DTR pin and enable printer flow control
 	pinMode(DTR_pin, INPUT_PULLUP);
