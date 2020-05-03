@@ -7,6 +7,7 @@
     silviutoderita.com
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+#include "config.h"
 #include "Arduino.h" //Arduino Library
 #include "EEPROM.h" //EEPROM Library
 #include "Persistent_Storage.h" //Silviu's Persistent Storage library
@@ -26,23 +27,30 @@
 
 
 Persistent_Storage phone_book("phone_book"); //Storage object for the phone book
+Persistent_Storage config("config"); //Storage object for config file
 
-WiFi_Manager WiFi_manager(10000); //WiFi Manager object with a 10 second connection timeout
-Web_Interface web_interface(false); //Web Interface Object with console_persist set to false
+WiFi_Manager WiFi_manager; //WiFi Manager object
+Web_Interface web_interface; //Web Interface Object
 NTP_Clock NTP_clock; //NTP object
 
 WiFiClient ESP_client; //Generic Client object for MQTT client
 PubSubClient MQTT_client(ESP_client); //MQTT client object
-Twilio twilio("AC6e91a7c91c69b11d1d621f9f09ce0858", "9cc8633f6e84411fd69e2a17b3e82258", "BC B0 1A 32 80 5D E6 E4 A2 29 66 2B 08 C8 E0 4C 45 29 3F D0"); //Twilio object
+Twilio twilio; //Twilio object
 
-Thermal_Printer printer(115200, D7); //Printer object
-
-const char* device_name = "tagmachine"; //Device Name
-const char* device_password = "sebastian"; //Device Password
+Thermal_Printer printer; //Printer object
 
 String last_message_ID;
 
+String phone_number;
+String device_name = "tagmachine";
+String device_password = "12345678";
+String owner_name = "User";
+
+String MQTT_address;
 bool connected_to_MQTT = false;
+
+uint8_t LED_pin = 4;
+uint8_t button_pin = 5;
 
 
 /*  console_print: Print to the web console
@@ -251,7 +259,7 @@ void new_message(char* topic, byte* payload, unsigned int length){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool connect_to_MQTT(){
     //Set MQTT server
-    MQTT_client.setServer("silviutoderita.com", 1883);
+    MQTT_client.setServer(MQTT_address.c_str(), 1883);
     //Set callback for incoming message
     MQTT_client.setCallback(new_message);
 
@@ -347,28 +355,155 @@ void create_hotspot(){
 
 }
 
+String load_config(){
+    String error = "";
+    if(config.exists()){
+        phone_number = config.get("phone_number");
+            if(phone_number == "") error += "Missing phone number!\n";
+        device_name = config.get("device_name");
+            if(device_name == "") device_name = "tagmachine";
+        device_password = config.get("device_password");
+            if(device_password == "") device_password = "12345678";
+        owner_name = config.get("owner_name");
+            if(owner_name == "") owner_name = "User";
+
+        String printer_baud = config.get("printer_baud");
+            if(printer_baud == "") printer_baud = "9600";
+        String printer_DTR_pin = config.get("printer_DTR_pin");
+            if(printer_DTR_pin == "") printer_DTR_pin = "13";
+        printer.config(printer_baud.toInt(), printer_DTR_pin.toInt());
+        
+        String button_pin_string = config.get("button_pin");
+        if(button_pin_string != ""){
+            button_pin = button_pin_string.toInt();
+        }
+
+        String LED_pin_string = config.get("LED_pin"); 
+        if(LED_pin_string != ""){
+            LED_pin = LED_pin_string.toInt();
+        }
+
+        //Add the network to the WiFi Manager
+        String WiFi_SSID = config.get("WiFi_SSID");
+        if(WiFi_SSID != ""){
+            String WiFi_password = config.get("WiFi_password");
+            if(WiFi_password == "" || WiFi_password == "none") WiFi_password = "";
+            WiFi_manager.add_network(config.get("WiFi_SSID"),config.get("WiFi_password"));
+        }else{
+            error += "Missing WiFi SSID!\n";
+        }
+
+        if(config.get("WiFi_timeout") != ""){
+            WiFi_manager.config(config.get("WiFi_timeout").toInt());
+        }
+        
+        if(config.get("Twilio_account_sid") != "" && config.get("Twilio_auth_token") != ""){
+            String Twilio_fingerprint = config.get("Twilio_fingerprint");
+                if(Twilio_fingerprint == "") Twilio_fingerprint = "BC B0 1A 32 80 5D E6 E4 A2 29 66 2B 08 C8 E0 4C 45 29 3F D0";
+            twilio.config(config.get("Twilio_account_sid"), config.get("Twilio_auth_token"), Twilio_fingerprint);
+        }else{
+            error += "Missing Twilio account SID or auth token!\n";
+        }
+
+        if(config.get("MQTT_address") != ""){
+            MQTT_address = config.get("MQTT_address");
+        }else{
+            error += "Missing MQTT broker address!\n";
+        }
+        
+
+        String pcv = config.get("persistent_console");
+        if(pcv == "FALSE" || pcv == "False" || pcv == "false" || pcv == "NO" || pcv == "No" || pcv == "no" || pcv == "N" || pcv == "n" || pcv == "0"){
+            web_interface.config(false);
+        }else{
+            web_interface.config(true);
+        }
+
+        String NTP_server = config.get("NTP_server");
+            if(NTP_server == "") NTP_server = "time.google.com";
+        String NTP_interval = config.get("NTP_interval");
+            if(NTP_interval == "") NTP_interval = 600;
+        String NTP_timezone = config.get("NTP_timezone");
+            if(NTP_timezone = "" || NTP_timezone == "AUTO" || NTP_timezone == "Auto" || NTP_timezone == "auto") NTP_timezone = NTP_CLOCK_AUTO;
+        String NTP_timeout = config.get("NTP_timeout");
+            if(NTP_timeout = "") NTP_timeout = 5000;
+
+        NTP_clock.config(NTP_server, NTP_interval.toInt(), NTP_timezone.toInt(), NTP_timeout.toInt());
+    }else{
+        error = "Missing config file!";
+        config.put("phone_number", "\t\t//REQUIRED - Phone number including country code(numbers only)");
+        config.put("device_name", "\t\t//Device name (no spaces) - Default: tagmachine");
+        config.put("device_password", "\t\t//Device password - Default: 12345678");
+        config.put("owner_name", "\t\t//Your name - Default: User");
+        config.put("printer_baud", "\t\t//Baud rate of thermal printer. To get this, hold the button on the printer while plugging it in. Default: 9600");
+        config.put("printer_DTR_pin", "\t\t//ESP8266 pin that printer DTR is connected to (GPIO number) - Default: 13");
+        config.put("button_pin", "\t\t//ESP8266 pin that button is connected to (GPIO number) - Default: 5");
+        config.put("LED_pin", "\t\t//ESP8266 pin that LED is connected to (GPIO number) - Default: 4");
+        config.put("WiFi_SSID", "\t\t//REQUIRED - SSID of local WiFi Network");
+        config.put("WiFi_password", "\t\t//Password of local WiFi Network - Default: none");
+        config.put("WiFi_timeout", "\t\t//Timeout in ms to attempt to connect to WiFi Network - Default: 10000");
+        config.put("Twilio_account_sid", "\t\t//REQUIRED - Twilio Account SID, get this from Twilio dashboard");
+        config.put("Twilio_auth_token", "\t\t//REQUIRED - Twilio Auth Token, get this from Twilio dashboard");
+        config.put("Twilio_fingerprint", "\t\t//Twilio SHA1 fingerprint, get this from SSL certificate of api.twilio.gom - Default: BC B0 1A 32 80 5D E6 E4 A2 29 66 2B 08 C8 E0 4C 45 29 3F D0");
+        config.put("MQTT_address", "\t\t//REQUIRED - URL of the MQTT broker used for relaying Twilio messages");
+        config.put("persistent_console", "\t\t//Persist console contents when console isn't open - Default: false");
+        config.put("NTP_server", "\t\t//URL of NTP server to use for time - Default: time.google.com");
+        config.put("NTP_interval", "\t\t//Interval in s to update time using NTP server - Default: 600");
+        config.put("NTP_timezone", "\t\t//Timezone offset from UTC in minutes (optionally -) - Default: auto");
+        config.put("NTP_timeout", "\t\t//Timeout in ms to wait for NTP connection - Default: 5000");
+    }
+
+    return error;
+}
+
+void bootloader(bool web_interface_on){
+    //Create a hotspot
+    WiFi_manager.create_hotspot(device_name, device_password);
+
+    uint32_t start = millis();
+    bool LED_on = false;
+    while(true){
+        uint32_t time_elapsed = millis() - start;
+        if(LED_on && time_elapsed % 250 < 125){
+            digitalWrite(LED_pin, HIGH);
+            LED_on = false;
+        }else if(!LED_on && time_elapsed % 250 >= 125){
+            digitalWrite(LED_pin, LOW);
+            LED_on = true;
+        }
+        //Run multicast DNS 
+        MDNS.update();
+        //Run OTA updater service
+        ArduinoOTA.handle(); 
+
+        if(web_interface_on){
+            web_interface.handle();
+        }
+
+        yield();
+    }
+
+}
+
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ####  SETUP  ####
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void setup() {
-    //Initialize the printer with the callback function for printing to the console
-    printer.begin(console_callback);
-    //Set the callback functions for the Wi-Fi Manager
-    WiFi_manager.set_callbacks(connected, disconnected, connection_failed);
-
-    //Initialize the button and LED
-    pinMode(D1, INPUT_PULLUP);
-    pinMode(D2, OUTPUT);
-    digitalWrite(D2, LOW);
-
     //Start SPI Flash File System
     SPIFFS.begin(); 
     SPIFFS.gc();
 
-    //Start the OTA updater using the device_name as the hostname and device_password as the password
-    ArduinoOTA.setHostname(device_name); 
-    ArduinoOTA.setPassword(device_password); 
+    pinMode(button_pin, INPUT_PULLUP); //default 5
+    pinMode(LED_pin, OUTPUT); // default 4
+    digitalWrite(LED_pin, LOW); 
 
+    String error = load_config();
+
+    //Start the multicast DNS with the device_name as the address
+    MDNS.begin(device_name);
+
+    //Initialize the EEPROM with 4 bits
+    EEPROM.begin(4);
     //When an OTA update starts...
     ArduinoOTA.onStart([](){
         //Disable SPIFFS
@@ -380,32 +515,29 @@ void setup() {
         EEPROM.commit();
     });
 
+    web_interface.begin();
+
+    //Start the OTA updater using the device_name as the hostname and device_password as the password
+    ArduinoOTA.setHostname(device_name.c_str()); 
+    ArduinoOTA.setPassword(device_password.c_str()); 
+
     //Begin listening for OTA updates
     ArduinoOTA.begin();
 
-    //Start the multicast DNS with the device_name as the address
-    MDNS.begin(device_name);
-
-    //If the button is pressed down during boot, enter the bootloader
-    if(!digitalRead(D1)){
-        //Create a hotspot
-        WiFi_manager.create_hotspot(device_name, device_password);
-
-        //For 90 seconds...
-        uint32_t start = millis();
-        while(millis() < start + 90000){
-            //Flash the LED
-            digitalWrite(D2, LOW); delay(250); digitalWrite(D2, HIGH); delay(250);
-            //Run multicast DNS 
-            MDNS.update();
-            //Run OTA updater service
-            ArduinoOTA.handle(); 
-        }
-
+    if(error != ""){
+        console("BOOT ERROR - Config File Error:");
+        console(error);
+        bootloader(true);
+    }else if(!digitalRead(D1)){
+        bootloader(false);
     }
 
-    //Initialize the EEPROM with 4 bits
-    EEPROM.begin(4);
+
+
+    //Initialize the printer with the callback function for printing to the console
+    printer.begin(console_callback);
+    //Set the callback functions for the Wi-Fi Manager
+    WiFi_manager.set_callbacks(connected, disconnected, connection_failed);
 
     //Read the EEPROM to see if an OTA update was just completed...
     if(EEPROM.read(0) == 0){
@@ -420,9 +552,6 @@ void setup() {
 
     //Print the title
     printer.print_title("TAG MACHINE", 2);
-
-    //Add the network to the WiFi Manager
-    WiFi_manager.add_network((char*)"Azaviu 2.4GHz", (char*)"sebastian");
     
     //Start the Wi-Fi
     begin_WiFi();

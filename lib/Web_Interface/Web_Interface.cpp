@@ -115,19 +115,48 @@ void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
 
 }
 
-/*  Web_Interface Constructor
-        persistent_console_in: Set true to persist console when console page is
-            not open
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-Web_Interface::Web_Interface(bool persistent_console_in){
-    persistent_console = persistent_console_in;
+void handle_settings_get(){
+    File file = SPIFFS.open("/config.txt", "r");
+    server.streamFile(file, "text/plain");
+    file.close();
+}
 
+void handle_settings_post(){
+    websockets_server.sendTXT(websockets_client, "POST RECEIVED");
+    String arg = server.argName(0);
+    websockets_server.sendTXT(websockets_client, arg);
+    File file = SPIFFS.open("/config.txt", "w");
+    file.print(server.arg("data"));
+    file.close();
+    ESP.restart();
+}
+
+/*  Web_Interface Constructor (with defaults)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+Web_Interface::Web_Interface(){
+    config(false);
+}
+
+/*  config
+        persistent_console_in: Set true to persist console when console page is
+            not open (default: false)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Web_Interface::config(bool persistent_console_in){
+    persistent_console = persistent_console_in; 
+}
+
+/*  begin: Start the web interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Web_Interface::begin(){
     //If a file is requested, send it if it exists or send a generic 404 if it doesn't exist
     server.onNotFound([](){
         if(!handle_file_read(server.uri())){
             server.send(404, "text/plain", "404: Not Found");
         }
     });
+
+    server.on("/config.txt", HTTP_POST, handle_settings_post);
+    server.on("/config.txt", HTTP_GET, handle_settings_get);
 
     //If a websockets message comes in, call this function
     websockets_server.onEvent(websockets_event);
@@ -138,9 +167,7 @@ Web_Interface::Web_Interface(bool persistent_console_in){
 
     //If a console.txt file exists, delete it to start with a clean console upon init
     if(SPIFFS.exists("/www/console.txt")) SPIFFS.remove("/www/console.txt"); 
-
 }
-
 /*  handle: Check for incoming requests to the server and to the websockets server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Web_Interface::handle(){

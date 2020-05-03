@@ -1,0 +1,20 @@
+phone_number:16043739569		//Phone number including country code(numbers only) - REQUIRED
+device_name:		//Device name (no spaces) - Default; tagmachine
+device_password:		//Device password - Default; 12345678
+owner_name:Silviu		//Your name - Default; User
+printer_baud:115200		//Baud rate of thermal printer. To get this, hold the button on the printer while plugging it in. Default; 9600
+printer_DTR_pin:13		//ESP8266 pin that printer DTR is connected to (GPIO number) - Default 13
+button_pin:5		//ESP8266 pin that button is connected to (GPIO number) - Default; 5
+LED_pin:4		//ESP8266 pin that LED is connected to (GPIO number) - Default; 4
+WiFi_SSID:Azaviu 2.4GHz		//SSID of local WiFi Network - REQUIRED
+WiFi_password:sebastian		//Password of local WiFi Network - OPTIONAL
+WiFi_timeout:		//Timeout in ms to attempt to connect to WiFi Network - Default; 10000
+Twilio_account_sid:AC6e91a7c91c69b11d1d621f9f09ce0858		//Twilio Account SID, get this from Twilio dashboard - REQUIRED
+Twilio_auth_token:9cc8633f6e84411fd69e2a17b3e82258		//Twilio Auth Token, get this from Twilio dashboard - REQUIRED
+Twilio_fingerprint:		//Twilio SHA1 fingerprint, get this from SSL certificate of api.twilio.gom - Default: BC B0 1A 32 80 5D E6 E4 A2 29 66 2B 08 C8 E0 4C 45 29 3F D0
+MQTT_address:silviutoderita.com		//URL of the MQTT broker used for relaying Twilio messages - REQUIRED
+persistent_console:		//Persist console contents when console isn't open - Default: true
+NTP_server:		//URL of NTP server to use for time - Default; time.google.com
+NTP_interval:		//Interval in s to update time using NTP server - Default; 600
+NTP_timezone:		//Timezone offset from UTC in minutes (optionally -) - Default; auto
+NTP_timeout:		//Timeout in ms to wait for NTP connection - Default; 5000

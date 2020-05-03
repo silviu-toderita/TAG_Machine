@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang=en>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink_to_fit=no">
+
+        <title> TAG Machine </title>
+
+        <!--Load Bootstrap-->
+        <link rel='stylesheet' href='lib/bs.css'>
+        <!--Load jQuery-->
+        <script src="lib/jq.js"></script>
+        <!--Load Bootstrap Javascript (includes Popper)-->
+        <script src="lib/bs.js"></script>
+
+        <!--Load Javascript-->
+        <script>
+            //Load the navbar
+            $.get("nav.html", function(data){
+                $("#navigation").replaceWith(data);
+            });
+
+            $(document).ready(function(){
+                $('#settings').load("config.txt");
+            });
+
+            $('#submit').click(function(){
+                $.post("/config.txt", { data:$("settings").val() } );
+            });
+            
+        </script>
+
+    </head>
+
+    <body>
+        <div id="navigation"></div>
+
+        <!--Main container with a viewport height of 65%-->
+        <main class="container" style="height: 65vh">
+            <header class="page-header header container">
+                <h2>Settings</h2>
+            </header>
+            
+            <!--Console text area-->
+            <div class="h-100 form-group">
+                <textarea class="h-100 form-control" id="settings">Loading...</textarea>
+                <br><br>
+                <button type="submit" class="btn btn-dark float-right" id="submit">Save and Restart</button>
+            </div>
+        </main>
+        
+        
+
+    </body>
+</html> 

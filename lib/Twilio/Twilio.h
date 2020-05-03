@@ -6,7 +6,10 @@
 class Twilio {
 
     public:
-        Twilio(String, String, String);
+        Twilio();
+
+        void 
+            config (String, String, String);
 
         bool 
             send_message(String, String, String);

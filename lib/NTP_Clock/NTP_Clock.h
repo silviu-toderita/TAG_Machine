@@ -19,15 +19,14 @@
 class NTP_Clock{
     public:
 
-        NTP_Clock(char*, uint16_t, int16_t);
         NTP_Clock();
 
         void
+            config(String, uint16_t, int16_t, uint16_t),
             handle();
 
         bool 
             status(),
-            begin(uint32_t),
             begin(),
             get_timezone();
 

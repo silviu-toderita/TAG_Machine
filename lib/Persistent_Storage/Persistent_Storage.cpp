@@ -74,7 +74,7 @@ String remove_spaces_and_comments(String input){
     //Go through every character and store the last character that wasn't a space
     uint16_t last_character = 0;
     for(uint16_t i = 0; i < comments_removed.length(); i++){
-        if(comments_removed.charAt(i) != ' ') last_character = i;
+        if(comments_removed.charAt(i) != ' ' && comments_removed.charAt(i) != '\t') last_character = i;
     }
 
     //If the string has no characters or all spaces, return ""
@@ -106,8 +106,8 @@ void Persistent_Storage::put(String key, String value){
         file_exists = true;
 
         //If the file does not exist, create it and write the key:value pair
-        if(!SPIFFS.exists("/" + filename + ".sto")){
-            File file = SPIFFS.open("/" + filename + ".sto", "w");
+        if(!SPIFFS.exists("/" + filename + ".txt")){
+            File file = SPIFFS.open("/" + filename + ".txt", "w");
 
             file.print(processed_key + ":" + processed_value + "\n");
             file.close();
@@ -118,8 +118,8 @@ void Persistent_Storage::put(String key, String value){
     }
 
     //Open the current file for reading and a new file for writing
-    File current_file = SPIFFS.open("/" + filename + ".sto", "r");
-    File new_file = SPIFFS.open("/" + filename + "NEW.sto", "w"); 
+    File current_file = SPIFFS.open("/" + filename + ".txt", "r");
+    File new_file = SPIFFS.open("/" + filename + "NEW.txt", "w"); 
 
 
     bool found_key = false;
@@ -148,7 +148,7 @@ void Persistent_Storage::put(String key, String value){
 
     //Close the current file and delete it
     current_file.close();
-    SPIFFS.remove("/" + filename + ".sto");
+    SPIFFS.remove("/" + filename + ".txt");
     
     //If the key was not found in the file, add the new key:value pair to the end of the new file
     if(!found_key){
@@ -157,23 +157,23 @@ void Persistent_Storage::put(String key, String value){
 
     //Close the new file and rename it to the current name
     new_file.close(); 
-    SPIFFS.rename("/" + filename + "NEW.sto","/" + filename + ".sto");
+    SPIFFS.rename("/" + filename + "NEW.txt","/" + filename + ".txt");
 }
 
 /*  get: Get the value of a specific key 
         key:
-    RETURNS Value of the key. If the key is not found, returns "".
+    RETURNS Value of the key. If the key is not found, returns "%NF".
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String Persistent_Storage::get(String key){
     //If the file does not exist, the key does not exist
-    if(!SPIFFS.exists("/" + filename + ".sto")) return "";
+    if(!SPIFFS.exists("/" + filename + ".txt")) return "";
 
     //Remove any reserved characters from the key
     String processed_key = remove_reserved_characters(key);
     String value = "";
 
     //Open the file for reading
-    File file = SPIFFS.open("/" + filename + ".sto", "r");
+    File file = SPIFFS.open("/" + filename + ".txt", "r");
     
     //Read through each line of the file
     while(file.position() < file.size() - 1){
@@ -198,14 +198,14 @@ String Persistent_Storage::get(String key){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Persistent_Storage::remove(String key){
     //If the file does not exist, the key does not exist
-    if(!SPIFFS.exists("/" + filename + ".sto")) return;
+    if(!SPIFFS.exists("/" + filename + ".txt")) return;
 
     //Remove any reserved characters from the key
     String processed_key = remove_reserved_characters(key);
 
     //Open the current file for reading and a new file for writing
-    File current_file = SPIFFS.open("/" + filename + ".sto", "r");
-    File new_file = SPIFFS.open("/" + filename + "NEW.sto", "w"); 
+    File current_file = SPIFFS.open("/" + filename + ".txt", "r");
+    File new_file = SPIFFS.open("/" + filename + "NEW.txt", "w"); 
 
     //Loop until the current file has been read completely
     while(current_file.position() < current_file.size() - 1){
@@ -226,10 +226,14 @@ void Persistent_Storage::remove(String key){
 
     //Close the current file and delete it
     current_file.close();
-    SPIFFS.remove("/" + filename + ".sto");
+    SPIFFS.remove("/" + filename + ".txt");
 
     //Close the new file and rename it to the current name
     new_file.close(); 
-    SPIFFS.rename("/" + filename + "NEW.sto","/" + filename + ".sto");
+    SPIFFS.rename("/" + filename + "NEW.txt","/" + filename + ".txt");
 
+}
+
+bool Persistent_Storage::exists(){
+    return SPIFFS.exists("/" + filename + ".txt");
 }

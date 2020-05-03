@@ -20,7 +20,7 @@
 
 WiFiUDP UDP; //Create a UDP object
 
-char* server_address; //Web Address for time server
+String server_address; //Web Address for time server
 IPAddress server_address_IP; //IP Address for time server
 const uint8_t NTP_packet_size = 48; //Packet size of NTP messages
 byte NTP_buffer[NTP_packet_size]; //NTP packet buffer
@@ -30,6 +30,8 @@ uint64_t last_request_millis = 0; //Time of last NTP request
 uint64_t last_response_millis; //Time of last NTP response
 uint32_t time_at_last_response = 0; //UNIX Time at last NTP response
 
+uint16_t connect_timeout;
+
 int16_t timezone_offset = 0; //Offset from UTC in minutes
 
 bool timezone_valid; //Is the current timezone valid
@@ -37,16 +39,26 @@ bool timezone_auto; //Timezone obtained automatically
 
 uint32_t external_UNIX_time = 0;
 
-/*  NTP_Clock Constructor
+/*  NTP_Clock Constructor (with defaults)
+        server: time.google.com
+        interval: 10 minutes
+        timezone: auto
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+NTP_Clock::NTP_Clock(){ 
+    config((char*)"time.google.com", 600, NTP_CLOCK_AUTO, 5000);
+}
+
+/*  config
         server: NTP server address
         interval: NTP Update Interval in seconds
         timezone: Timezone offset from UTC in minutes (- or +). Can optionally be
             NTP_CLOCK_AUTO to get automatic timezone
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-NTP_Clock::NTP_Clock(char* server, uint16_t interval, int16_t timezone){ 
+void NTP_Clock::config(String server, uint16_t interval, int16_t timezone, uint16_t timeout){
     server_address = server;
     request_interval = interval;
     timezone_offset = timezone;
+    connect_timeout = timeout;
 
     //If the timezone is automatic, set the valid status to false as it must be obtained later
     if(timezone == NTP_CLOCK_AUTO){
@@ -58,15 +70,6 @@ NTP_Clock::NTP_Clock(char* server, uint16_t interval, int16_t timezone){
         timezone_auto = false;
         timezone_offset = timezone;
     }
-}
-
-/*  NTP_Clock Constructor (with defaults)
-        server: time.google.com
-        interval: 10 minutes
-        timezone: auto
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-NTP_Clock::NTP_Clock(){ 
-    NTP_Clock((char*)"time.google.com", 600, NTP_CLOCK_AUTO);
 }
 
 /*  send_NTP_Packet: Send a request packet to the NTP server
@@ -110,7 +113,11 @@ void NTP_Clock::handle(){
     }
 
     //If there is no IP address for the timeserver, attempt to get one
-    if(!server_address_IP) WiFi.hostByName(server_address, server_address_IP);
+    if(!server_address_IP){
+        char server_address_char[server_address.length()];
+        server_address.toCharArray(server_address_char, server_address.length());
+        WiFi.hostByName(server_address_char, server_address_IP);
+    } 
 
     //If there is no valid timezone, attempt to get one
     if(!timezone_valid){
@@ -153,14 +160,14 @@ bool NTP_Clock::status(){
         True if there is a valid time
         False if there is not a valid time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool NTP_Clock::begin(uint32_t timeout){ 
+bool NTP_Clock::begin(){ 
     if(status()) return true;
     
     UDP.begin(123); //Begin UDP connection
 
     //Try and get initial time within the specified timeout. If that fails, return false. 
     uint32_t start = millis();
-    while(millis() < start + timeout){
+    while(millis() < start + connect_timeout){
         handle();
         if(status()) return true;
         yield();
@@ -170,21 +177,13 @@ bool NTP_Clock::begin(uint32_t timeout){
     
 }
 
-/*  begin (with defaults)
-        timeout: 5 seconds
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool NTP_Clock::begin(){
-    //Run begin function with a timeout of 5s
-    return begin(5000);
-}
-
 /*  get_timezone: Get the timezone from worldtimeAPI.org based on current IP, and
         save it if successful
     RETURNS True if successful, false if not
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool NTP_Clock::get_timezone(){
     WiFiClient client; //Create a client object
-    client.setTimeout(5000);
+    client.setTimeout(connect_timeout);
     //If connection to the URL established...
     if(client.connect("worldtimeapi.org", 80)){
         //Send a request for the current timezone based on our IP

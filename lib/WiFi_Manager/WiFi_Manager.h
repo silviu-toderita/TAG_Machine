@@ -15,15 +15,16 @@ typedef void (*void_function_pointer)();
 class WiFi_Manager{
     public:
 
-        WiFi_Manager(uint32_t);
+        WiFi_Manager();
         
         void 
+            config(uint32_t),
             set_callbacks(void_function_pointer, void_function_pointer, void_function_pointer);
-        
+            
         bool 
             begin(),
-            create_hotspot(const char*, const char*),
-            add_network(char*, char*);
+            create_hotspot(String, String),
+            add_network(String, String);
         
         wm_status 
             handle();

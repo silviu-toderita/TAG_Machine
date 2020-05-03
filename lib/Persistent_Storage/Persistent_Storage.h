@@ -8,6 +8,9 @@ class Persistent_Storage{
         void 
             put(String, String),
             remove(String);
+
+        bool 
+            exists();
     
         String 
             get(String);

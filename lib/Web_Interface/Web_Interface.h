@@ -3,9 +3,11 @@
 class Web_Interface{
     public:
     
-        Web_Interface(bool);
+        Web_Interface();
     
         void 
+            begin(),
+            config(bool),
             handle(),
             console_print(String);
 

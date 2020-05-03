@@ -26,12 +26,18 @@ uint8_t printMode = 0; //printMode byte holds inverse, double height, double wid
  
 bool suppressed = false; //When printer is suppressed, it won't print but callback will still be called
 
-/*  Thermal_Printer constructor
-    baud_rate_in: Baud rate of printer, usually 9600 or 19200 but can go as high 
-    as 115200.
-    DTR_pin_in: ESP8266 pin that DTR pin of printer is connected to.
+/*  Thermal_Printer constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-Thermal_Printer::Thermal_Printer(uint32_t baud_rate_in, uint8_t DTR_pin_in){
+Thermal_Printer::Thermal_Printer(){
+    config(9600, 13);
+}
+
+/*  config
+        baud_rate_in: Baud rate of printer, usually 9600 or 19200 but can go as high 
+        as 115200 (default: 9600)
+        DTR_pin_in: ESP8266 pin that DTR pin of printer is connected to (default: 13)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void Thermal_Printer::config(uint32_t baud_rate_in, uint8_t DTR_pin_in){
     baud_rate = baud_rate_in;
     DTR_pin = DTR_pin_in;
 }

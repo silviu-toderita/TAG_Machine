@@ -16,8 +16,8 @@
 #include "ESP8266WiFi.h" //WiFi Library"
 #include "WiFi_Manager.h"
 
-char* SSID_list[32]; //WiFi Network Name
-char* password_list[32]; //WiFi Network Password
+String SSID_list[32]; //WiFi Network Name
+String password_list[32]; //WiFi Network Password
 uint8_t networks = 0; //Number of networks stored
 
 WiFiEventHandler connected_handler;
@@ -32,12 +32,10 @@ wm_status status = WM_IDLE; //Wifi Manager Status
 uint32_t timeout; //Timeout for connecting to a found WiFi Network
 uint32_t connect_start = 0; //Stores the millis() when we first started attempting to connect
 
-
-/*  WiFi_Manager constructor
-        timeout_in: Timeout in ms before connection considered failed
+/*  WiFi_Manager constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-WiFi_Manager::WiFi_Manager(uint32_t timeout_in){
-    timeout = timeout_in;
+WiFi_Manager::WiFi_Manager(){
+    config(10000);
 
     //When connected, change status to WM_CONNECTION SUCCESS
     connected_handler = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP& event){
@@ -48,7 +46,13 @@ WiFi_Manager::WiFi_Manager(uint32_t timeout_in){
     disconnected_handler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected& event){
         if(status == WM_CONNECTED) status = WM_CONNECTION_LOST;
     });
+}
 
+/*  config
+        timeout_in: Timeout in ms before connection considered failed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void WiFi_Manager::config(uint32_t timeout_in){
+    timeout = timeout_in;
 }
 
 /*  set_callbacks:
@@ -61,6 +65,8 @@ void WiFi_Manager::set_callbacks(void_function_pointer connected_callback, void_
     _connection_failed_callback = connection_failed_callback;
 }
 
+
+
 /*  (private) connect: Attempt to connect to a network
         ID: ID of network to attempt connection to
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -68,7 +74,12 @@ void connect(uint8_t ID){
     //Change status to WM_CONNECTING
     status = WM_CONNECTING;
     //Attempt to connect to network
-    WiFi.begin(SSID_list[ID], password_list[ID]);
+    if(password_list[ID] == ""){
+        WiFi.begin(SSID_list[ID]);
+    }else{
+        WiFi.begin(SSID_list[ID], password_list[ID]);
+    }
+    
     //Record the time connection attempt started
     connect_start = millis(); 
 }
@@ -147,7 +158,7 @@ bool WiFi_Manager::begin(){
         hotspot_password: Network password
     RETURNS True if hotspot established, false if not.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool WiFi_Manager::create_hotspot(const char* hotspot_SSID, const char* hotspot_password){
+bool WiFi_Manager::create_hotspot(String hotspot_SSID, String hotspot_password){
     //Switch to Access Point mode
     WiFi.mode(WIFI_AP);
     //Begin the hotspot
@@ -195,7 +206,7 @@ String WiFi_Manager::get_SSID(){
         password: Network password
     RETURNS True if successfully added, False if not
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool WiFi_Manager::add_network(char* SSID, char* password){
+bool WiFi_Manager::add_network(String SSID, String password){
   //Return false if maximum number of networks reached
   if(networks == 32) return false; 
 

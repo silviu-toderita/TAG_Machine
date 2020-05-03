@@ -21,11 +21,16 @@ String fingerprint;
 String auth_header;
 
 /*  Twilio constructor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+Twilio::Twilio(){
+}
+
+/*  config: Set configuration parameters
         account_sid_in: Twilio account ID
         auth_token_in: Twilio account auth token
         fingerprint_in: Twilio SHA1 fingerprint
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-Twilio::Twilio(String account_sid_in, String auth_token_in, String fingerprint_in){
+void Twilio::config(String account_sid_in, String auth_token_in, String fingerprint_in){
         account_sid = account_sid_in;
         fingerprint = fingerprint_in;
         auth_header = get_auth_header(account_sid, auth_token_in);

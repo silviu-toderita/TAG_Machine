@@ -14,9 +14,10 @@ typedef void (*voidFuncPtr)(const String input);
 class Thermal_Printer{
     public:
 
-        Thermal_Printer(uint32_t, uint8_t);
+        Thermal_Printer();
 
         void    
+            config(uint32_t, uint8_t),
             begin(voidFuncPtr),
             begin(),
             set_printing_parameters(uint8_t, uint8_t, uint8_t),
