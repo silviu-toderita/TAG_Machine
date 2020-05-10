@@ -1,85 +1,32 @@
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    An NTP library for the ESP8266. Able to get accurate time from 
-    an NTP server down to the second. Will calculate for leap 
-    years to year 2100. Able to get timezone automatically based 
-    on IP Address location.
+    A clock library for the ESP8266. Able to get accurate time from 
+    worldtimeapi.org down to the second. Will calculate for leap years to year 
+    2100. Able to get timezone automatically based on IP Address location.
 
-    To use, initialize an NTP_Clock object. Call the 
-    NTP_Clock.begin() function after connecting to a network, and 
-    then call the NTP_Clock.handle() function in every loop. 
+    To use, initialize an WTA_Clock object. Call the 
+    WTA_Clock.begin() function after connecting to a network, and 
+    then call the WTA_Clock.handle() function in every loop. 
 
     Created by Silviu Toderita in 2020.
     silviu.toderita@gmail.com
     silviutoderita.com
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#include "NTP_Clock.h"
-#include "WiFiUdp.h" //UDP Library
+#include "WTA_Clock.h"
 #include "ESP8266WiFi.h" //WiFi Library for hostname resolution
 #include "WiFiClient.h" //Web Client Library
 
-WiFiUDP UDP; //Create a UDP object
-
-String server_address; //Web Address for time server
-IPAddress server_address_IP; //IP Address for time server
-const uint8_t NTP_packet_size = 48; //Packet size of NTP messages
-byte NTP_buffer[NTP_packet_size]; //NTP packet buffer
-
-uint16_t request_interval; //Frequency of NTP requests in seconds
-uint64_t last_request_millis = 0; //Time of last NTP request
-uint64_t last_response_millis; //Time of last NTP response
-uint32_t time_at_last_response = 0; //UNIX Time at last NTP response
-
-uint16_t connect_timeout;
-
-int16_t timezone_offset = 0; //Offset from UTC in minutes
-
-bool timezone_valid; //Is the current timezone valid
-bool timezone_auto; //Timezone obtained automatically
-
-uint32_t external_UNIX_time = 0;
-
-/*  NTP_Clock Constructor (with defaults)
-        server: time.google.com
-        interval: 10 minutes
-        timezone: auto
+/*  WTA_Clock Constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-NTP_Clock::NTP_Clock(){ 
-    config((char*)"time.google.com", 600, NTP_CLOCK_AUTO, 5000);
+WTA_Clock::WTA_Clock(){ 
+    config(600);
 }
 
 /*  config
-        server: NTP server address
-        interval: NTP Update Interval in seconds
-        timezone: Timezone offset from UTC in minutes (- or +). Can optionally be
-            NTP_CLOCK_AUTO to get automatic timezone
+        interval: Time Update Interval in seconds (default: 600)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void NTP_Clock::config(String server, uint16_t interval, int16_t timezone, uint16_t timeout){
-    server_address = server;
+void WTA_Clock::config(uint16_t interval){
     request_interval = interval;
-    timezone_offset = timezone;
-    connect_timeout = timeout;
-
-    //If the timezone is automatic, set the valid status to false as it must be obtained later
-    if(timezone == NTP_CLOCK_AUTO){
-        timezone_valid = false;
-        timezone_auto = true;
-    //If a timezone is defined, set validity to true
-    }else{
-        timezone_valid = true;
-        timezone_auto = false;
-        timezone_offset = timezone;
-    }
-}
-
-/*  send_NTP_Packet: Send a request packet to the NTP server
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void NTP_Clock::send_NTP_packet(){ 
-    memset(NTP_buffer, 0, NTP_packet_size); //Clear NTP_buffer
-    NTP_buffer[0] = 0b11100011; //Set first byte of NTP_buffer
-    UDP.beginPacket(server_address_IP, 123); //Open a connection to the NTP server on port 123
-    UDP.write(NTP_buffer, NTP_packet_size); //Write the NTP_buffer
-    UDP.endPacket(); //Close the connection
 }
 
 /*  get_UNIX_time: Calculate the current UNIX time based on the 
@@ -87,134 +34,89 @@ void NTP_Clock::send_NTP_packet(){
     from another source
     RETURNS Current UNIX time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-uint32_t NTP_Clock::get_UNIX_time(){ 
+uint32_t WTA_Clock::get_UNIX_time(){ 
     //If there is no external time defined...
     if(external_UNIX_time == 0){
         //Current time is the time we received at the last NTP response, plus how much time has elapsed since then
         return time_at_last_response + ((millis() - last_response_millis)/1000);
+
     //If there is an external time defined...
     }else{
         //Return that time adjusted by the timezone_offset
-        return external_UNIX_time + timezone_offset*60;
+        return external_UNIX_time + timezone_offset;
     }
 }
 
+
 /*  handle: Should be run as often as possible, preferably in 
-    every loop. Checks if UDP packet should be sent and if UDP 
-    packet has been received.
+    every loop to update time if needed
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void NTP_Clock::handle(){ 
-    //If there is no time yet, attempt to update every 5 seconds. Otherwise the interval is normal. 
-    uint32_t interval;
-    if(time_at_last_response == 0){ 
-        interval = 5000;
-    }else{
-        interval = request_interval * 1000;
-    }
+void WTA_Clock::handle(){ 
 
-    //If there is no IP address for the timeserver, attempt to get one
-    if(!server_address_IP){
-        char server_address_char[server_address.length()];
-        server_address.toCharArray(server_address_char, server_address.length());
-        WiFi.hostByName(server_address_char, server_address_IP);
-    } 
+    //If it's been more than the interval since the last API request, send another.
+    if(millis() > last_response_millis + request_interval){ 
+        WiFiClient client; //Create a client object
+        //If connection to the URL established...
+        if(client.connect("worldtimeapi.org", 80)){
+            //Send a request for the current timezone based on this device's IP
+            client.print("GET /api/ip.txt HTTP/1.1\r\nHost: worldtimeapi.org\r\nConnection: close\r\n\r\n");
 
-    //If there is no valid timezone, attempt to get one
-    if(!timezone_valid){
-        if(get_timezone()){
-            timezone_valid = true;
+            //Read the response
+            String response;
+            while (client.available() || client.connected()){
+                    if(client.available()){
+                        String line = client.readStringUntil('\n');
+                        response += line + "\n";
+                        if(line.indexOf("week_number:") != -1) break;
+                    }
+                    yield();
+            }
+
+            //Parse response to get the UTC UNIX timestamp
+            String unix_time = response.substring(response.indexOf("unixtime: ") + 10, response.indexOf("\nutc_datetime:"));
+            //Parse response to get the timezone offset from UTC
+            String utc_offset = response.substring(response.indexOf("utc_offset: ") + 12, response.indexOf("\nweek_number:"));
+
+            //Timezone offset is equal to the hours of UTC offset * 3600 seconds...
+            timezone_offset = utc_offset.substring(0, 3).toInt() * 3600;
+            //Plus the minutes of UTC offset * 60 seconds. Make the minutes + or - depending on sign of hours
+            if(timezone_offset >= 0){
+                timezone_offset += utc_offset.substring(4,6).toInt() * 60;
+            }else{
+                timezone_offset = timezone_offset - utc_offset.substring(4,6).toInt() * 60;
+            }
+
+            //Store the current time
+            time_at_last_response = unix_time.toInt() + timezone_offset;
+            //Store the internal time at which the current time was last received 
+            last_response_millis = millis();
         }
     }
-    
-    //If it's been more than the interval since the last NTP Request, send another.
-    if(millis() - last_request_millis > interval){ 
-        last_request_millis = millis();
-        send_NTP_packet();
-        //If the timezone offset is 0, there is a high chance that the timezone offset is wrong. Attempt to get another one
-        if(timezone_auto && timezone_offset == 0){
-            get_timezone();
-        }
-    }
 
-     //If there is any data in the UDP buffer, process it
-    if(UDP.parsePacket() != 0){
-        UDP.read(NTP_buffer, NTP_packet_size); //Read the UDP buffer into the NTP_buffer
-        uint32_t NTP_time = (NTP_buffer[40] << 24) | (NTP_buffer[41] << 16) | (NTP_buffer[42] << 8) | NTP_buffer[43]; //Extract NTP time from the bytes
-        time_at_last_response = NTP_time - 2208988800UL + timezone_offset*60; //Convert NTP time to UNIX Time, and take into account time zone
-        last_response_millis = millis(); //Update the time of last NTP response
-    }
 }
 
 /*  status:
     RETURNS True if there is a valid time, false if not.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool NTP_Clock::status(){
+bool WTA_Clock::status(){
     if(!time_at_last_response) return false;
     return true;
 }
 
-/*  begin: Should be run after a network connection is 
-    established. 
-        timeout: How long to wait for an initial connection
-    RETURNS 
-        True if there is a valid time
-        False if there is not a valid time
+/*  begin: Should be run after a network connection is established and will attempt to get the time twice
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool NTP_Clock::begin(){ 
-    if(status()) return true;
-    
-    UDP.begin(123); //Begin UDP connection
-
-    //Try and get initial time within the specified timeout. If that fails, return false. 
-    uint32_t start = millis();
-    while(millis() < start + connect_timeout){
-        handle();
-        if(status()) return true;
-        yield();
-    }
-
-    return false;
-    
-}
-
-/*  get_timezone: Get the timezone from worldtimeAPI.org based on current IP, and
-        save it if successful
-    RETURNS True if successful, false if not
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-bool NTP_Clock::get_timezone(){
-    WiFiClient client; //Create a client object
-    client.setTimeout(connect_timeout);
-    //If connection to the URL established...
-    if(client.connect("worldtimeapi.org", 80)){
-        //Send a request for the current timezone based on our IP
-        client.println("GET /api/ip.txt HTTP/1.1\r\nHost: worldtimeapi.org\r\nConnection: close\r\n\r\n");
-
-        //Read the response
-        String response;
-        while (client.connected() || client.available()){
-                if(client.available()){
-                        response += client.readStringUntil('\n') + "\n";
-                }
-                yield();
-        }
-
-        //Parse response to get utc_offset
-        String utc_offset = response.substring(response.indexOf("utc_offset: ") + 12, response.indexOf("\nweek_number:"));
-        //Timezone offset is equal to the hours + minutes of UTC offset
-        timezone_offset = utc_offset.substring(0, 3).toInt() * 60 + utc_offset.substring(4,6).toInt();
-
-        return true;
-    }
-
-    //If connection to the URL is not established, return false
-    return false;
+void WTA_Clock::begin(){ 
+    if(status()) return;
+    handle();
+    if(status()) return;
+    handle();
 
 }
 
 /*  get_leap_years
     RETURNS number of leap years since 2019
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-uint8_t NTP_Clock::get_leap_years(){ 
+uint8_t WTA_Clock::get_leap_years(){ 
     return (get_UNIX_time() - 1483228800) / 126230400; //(Current time - time@Jan 1, 2017) / Seconds in 4 years
 }
 
@@ -222,7 +124,7 @@ uint8_t NTP_Clock::get_leap_years(){
 /*  get_year
     RETURNS current year
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-uint16_t NTP_Clock::get_year(){
+uint16_t WTA_Clock::get_year(){
     return ((get_UNIX_time() - 1546300800 - (get_leap_years() * 86400)) / 31536000) + 2019; //((Current time - Time Jan 1, 2019 - leap day differential) / seconds in a year) + 2019
 }
 
@@ -230,7 +132,7 @@ uint16_t NTP_Clock::get_year(){
         add_zero: Add a zero before single-digit number
     RETURNS current month as a number (String)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_month_number(bool add_zero){
+String WTA_Clock::get_month_number(bool add_zero){
     uint16_t adjusted_day_of_year = get_day_of_year();
 
     //If it's a leap year, adjust the day of the year by -1 for all months except January, as each month will end one day later. 
@@ -277,7 +179,7 @@ String NTP_Clock::get_month_number(bool add_zero){
         short_month: Shorten month name to 3 letters
     RETURNS current month as a word
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_month_text(bool short_month){
+String WTA_Clock::get_month_text(bool short_month){
     uint8_t month_number = get_month_number(false).toInt();
     
     String month;
@@ -315,7 +217,7 @@ String NTP_Clock::get_month_text(bool short_month){
 /*  get_day_of_year
     RETURNS current day of the year
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-uint16_t NTP_Clock::get_day_of_year(){
+uint16_t WTA_Clock::get_day_of_year(){
     //Time at the start of the year = time at start of 2019 + ((current year - 2019) * time in a year) + (number of leap years since 2019 * time in a day)
     uint32_t time_at_start_of_year = 1546300800 + ((get_year() - 2019) * 31536000 + (get_leap_years() * 86400));
     //return current time - time at the start of this year / time in a day + 1
@@ -326,7 +228,7 @@ uint16_t NTP_Clock::get_day_of_year(){
         add_zero: Add a zero before single-digit number
     RETURNS currrent day of the month
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_day_of_month(bool add_zero){
+String WTA_Clock::get_day_of_month(bool add_zero){
     uint16_t adjusted_day_of_year = get_day_of_year();
 
     //If it's a leap year, adjust the day of the year by -1 for all months except January and February, as each month will start one day later. 
@@ -375,7 +277,7 @@ String NTP_Clock::get_day_of_month(bool add_zero){
         short_day: Shorten day name to 3 letters
     RETURNS currrent day of the week
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_day_of_week(bool short_day){
+String WTA_Clock::get_day_of_week(bool short_day){
 
     //days_since_start_of_2019 = (current time - time at start of 2019) / time in a day
     uint16_t days_since_start_of_2019 = (get_UNIX_time() - 1546300800) / 86400;
@@ -406,7 +308,7 @@ String NTP_Clock::get_day_of_week(bool short_day){
 /*  get_AM_PM
     RETURNS AM or PM
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_AM_PM(){
+String WTA_Clock::get_AM_PM(){
     //Current hour = (current time / time in an hour) remainder / 24
     uint8_t hour = get_UNIX_time() / 3600 % 24;
     if(hour <= 11){
@@ -420,7 +322,7 @@ String NTP_Clock::get_AM_PM(){
         format_24_hour: 24 hour format
     RETURNS currrent hour
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_hour(bool add_zero, bool format_24_hour){ 
+String WTA_Clock::get_hour(bool add_zero, bool format_24_hour){ 
     //Current hour = (current time / time in an hour) remainder / 24
     uint8_t hour = get_UNIX_time() / 3600 % 24;
 
@@ -447,7 +349,7 @@ String NTP_Clock::get_hour(bool add_zero, bool format_24_hour){
         add_zero: Add a zero before single-digit number
     RETURNS currrent minute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_minute(bool add_zero){
+String WTA_Clock::get_minute(bool add_zero){
     //minute = (current time / 60) remainder of / 60
     uint8_t minute = get_UNIX_time() / 60 % 60;
 
@@ -462,7 +364,7 @@ String NTP_Clock::get_minute(bool add_zero){
         add_zero: Add a zero before single-digit number
     RETURNS currrent second
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_second(bool add_zero){
+String WTA_Clock::get_second(bool add_zero){
     //Second = (current time) remainder / 60
     uint8_t second = get_UNIX_time() % 60;
 
@@ -477,7 +379,7 @@ String NTP_Clock::get_second(bool add_zero){
     RETURNS currrent date and time formatted as: 
     "DAY MON DD, YEAR - HH:MMam"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_date_time(){
+String WTA_Clock::get_date_time(){
     //If current time is unknown, return blank date_time
     if(!status()) return "### ### ##, #### - ##:####";
 
@@ -489,7 +391,7 @@ String NTP_Clock::get_date_time(){
     RETURNS currrent date and time formatted as: 
     "DAY MON DD, YEAR - HH:MMam"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_date_time(uint32_t external_time){
+String WTA_Clock::get_date_time(uint32_t external_time){
     //Set external_UNIX_time based on input
     external_UNIX_time = external_time;
     //Get date/time string
@@ -504,7 +406,7 @@ String NTP_Clock::get_date_time(uint32_t external_time){
     RETURNS currrent date and time formatted as: 
     "YEAR/MM/DD-HH:MM:SS"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String NTP_Clock::get_timestamp(){
+String WTA_Clock::get_timestamp(){
     //If time is unknown, return a blank timestamp
     if(!status()) return "####/##/##-##:##:##";
     

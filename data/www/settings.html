@@ -20,33 +20,45 @@
                 $("#navigation").replaceWith(data);
             });
 
-            $(document).ready(function(){
-                $('#settings').load("config.txt");
+            //Load the settings form
+            $.get("settings.txt", function(data){
+                $("#settings").replaceWith(data);
             });
 
-            $('#submit').click(function(){
-                $.post("/config.txt", { data:$("settings").val() } );
+            $(document).ready(function(){
+                //When the submit button is clicked, the settings form is POSTed to the ESP and an alert is displayed in the browser
+                $('#submit-button').click(function(){
+                    $.post("settings.txt", $("#settings-form").serialize(), function(data){
+                        alert("Settings Updated! TAG Machine is Restarting...");
+                    });
+                });
             });
+
             
         </script>
 
     </head>
 
     <body>
+        <!--This will be replaced with the navbar-->
         <div id="navigation"></div>
 
-        <!--Main container with a viewport height of 65%-->
-        <main class="container" style="height: 65vh">
+        <!--Main container-->
+        <main class="container">
             <header class="page-header header container">
                 <h2>Settings</h2>
             </header>
             
-            <!--Console text area-->
-            <div class="h-100 form-group">
-                <textarea class="h-100 form-control" id="settings">Loading...</textarea>
-                <br><br>
-                <button type="submit" class="btn btn-dark float-right" id="submit">Save and Restart</button>
-            </div>
+            <!--Settings Area-->
+            <form id="settings-form" name="settings-form">
+                <!--This will be replaced with the dynamic settings form-->
+                <div id="settings">
+                    Loading Settings...
+                </div>
+
+                <!--Submit Button-->
+                <button type="submit" class="btn btn-dark float-right" id="submit-button">Save and Restart</button>
+            </form>
         </main>
         
         

@@ -15,11 +15,6 @@
 const char* host = "api.twilio.com";
 const int   httpsPort = 443;
 
-//Account ID, Twilio fingerprint, and auth header created from account ID and auth token
-String account_sid;
-String fingerprint;
-String auth_header;
-
 /*  Twilio constructor
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Twilio::Twilio(){

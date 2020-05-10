@@ -46,17 +46,16 @@ function saveImage(URL){
     return new Promise(function(resolve, reject){
         //Read the image
         Jimp.read(URL, async (err, image) => {
+            if(!image){
+                resolve("NS");
+                return;
+            }
+            
             //Scale it to fit the maximum width of 384
             image.scaleToFit(384, Jimp.AUTO);
 
-            //If the width is not a multiple of 8, pad the sides up to the next multiple of 8
-            if(image.bitmap.width % 8 != 0){
-                var padding = 8 - (image.bitmap.width % 8);
-                image.contain(image.bitmap.width + padding, Jimp.AUTO);
-            }
-
-        
-            var size = image.bitmap.width * image.bitmap.height; //The amount of pixels in this image
+            //The amount of pixels in this image
+            var size = image.bitmap.width * image.bitmap.height; 
     
             //Go through each pixel. If any pixel has slight transparency and is black, change it to white. 
             for(var i = 0; i < size * 4; i = i + 4){
@@ -71,13 +70,11 @@ function saveImage(URL){
             var ditherImage = floydSteinberg(image.bitmap);
     
             //Create new bit buffer
-            let buffer = new BitBuffer(size + 32);
+            let buffer = new BitBuffer(size + 16);
             
-            //Assign the first 4 bytes of the buffer to the width & height
-            buffer.setByte(Math.floor(ditherImage.width/128));
-            buffer.setByte(ditherImage.width%128);
-            buffer.setByte(Math.floor(ditherImage.height/128));
-            buffer.setByte(ditherImage.height%128);
+            //Assign the first 2 bytes of the buffer to the height
+            buffer.setByte(Math.floor(ditherImage.height/256));
+            buffer.setByte(ditherImage.height%256);
     
             //Write each pixel to the buffer. We only write every 4th pixel, as the bitmap is still in 32-bit format. 
             for(var i = 0; i < size * 4; i = i + 4){
@@ -89,6 +86,7 @@ function saveImage(URL){
     
             }
             
+            //Get the current image number based on the last image number, so that we can store up to 256 images at once in case the tag machine is offline
             var imageNum = 1;
             var storedImageNum = await storage.getItem('imageNum');
             if(storedImageNum < 255){
@@ -96,16 +94,19 @@ function saveImage(URL){
             }
 
             //Output the file
-            fs.writeFileSync("/var/www/silviutoderita-com/img/" + imageNum + ".bbf", buffer.buffer);
+            fs.writeFileSync("/var/www/silviutoderita-com/img/" + imageNum + ".dat", buffer.buffer);
 
+            //Store this imagenumber
             await storage.setItem('imageNum', imageNum);
 
+            //Resolve the promise once all the image processing is done
             resolve(imageNum);
         });
     });
     
 }
 
+//Initialize the storage object
 storage.init();
 
 //Connect to the local MQTT Server
@@ -125,14 +126,17 @@ async function sendMessage(data){
     }else{
         //If there are images, save each one and add its number to the media variable
         for(var i = 0; i < data.numMedia; i++){
+            //Store the image number after the image is processed
             var currentImg = String(await saveImage(data.media[i]));
             
+            //Add the image number to the media var
             if(media){
                 media = media + currentImg;
             }else{
                 media = currentImg;
             }
 
+            //If it's not the last image, add a comma to media
             if(i != data.numMedia - 1){
                 media = media + ',';
             }
@@ -153,7 +157,7 @@ async function sendMessage(data){
 const app = express();
 app.use(urlencoded({ extended: false}));
 
-//Do this if we get a POST request
+//Do this if a POST request is received
 app.post( '/sms', (req, res)  => {
 
     console.log(`Webhook received from Twilio...`);

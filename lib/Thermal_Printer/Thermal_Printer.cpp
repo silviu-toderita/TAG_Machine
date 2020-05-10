@@ -17,14 +17,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "Thermal_Printer.h"
 
-static voidFuncPtr _print_callback; //Callback function when printing
-
-uint32_t baud_rate; //Baud rate of printer
-uint8_t DTR_pin; //ESP8266 pin to use to detect DTR
-
-uint8_t printMode = 0; //printMode byte holds inverse, double height, double width, and bold font status
- 
-bool suppressed = false; //When printer is suppressed, it won't print but callback will still be called
+static voidFuncPtrStr _print_callback; //Callback function when printing
 
 /*  Thermal_Printer constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -46,8 +39,8 @@ void Thermal_Printer::config(uint32_t baud_rate_in, uint8_t DTR_pin_in){
       	print_callback: Callback function to be called anytime printing happens, 
         that should accept a single String arg.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::begin(voidFuncPtr print_callback){
-	//Begin the serial connection to the printer after a 100ms delay to allow for OTA update serial garbage to finish
+void Thermal_Printer::begin(voidFuncPtrStr print_callback){
+	//Begin the serial connection to the printer after a 150ms delay to allow for OTA update serial garbage to finish
 	delay(150);
 	Serial.begin(baud_rate);
 	Serial.set_tx(2); //Set the TX port to GPIO2
@@ -116,7 +109,6 @@ void Thermal_Printer::offline(){
 void Thermal_Printer::suppress(bool suppressed_in){
     suppressed = suppressed_in;
 }
-
 
 /*	feed: Advance the paper roll.
       	feed_amount: Amount of lines to advance the paper roll by. 
@@ -254,36 +246,48 @@ void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount){
 			byte, 1-bit bitmap with each byte being MSB. Width must be exactly 384 to
 			match printer width.
 		feed_amount: Amount to feed after image.
+        description: Text describing the photo to be sent back to printer callback
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount){
-	uint16_t height = file.read() * 256; //First byte is height * 256
-	height += file.read(); //Second byte is more height
+void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount, String description){
+	
+    //Print the description to the callback
+	_print_callback(description);
 
-	//While there are still lines to print
-	while(height != 0){
-		//Print up to 255 lines per chunk
-		uint8_t chunk_height = 255;
-		//If there are less than 255 lines left, the chunk will be exactly the height remaining
-		if(height < 255){
-		chunk_height = height;
-		}
+    //Only print if the printing has not been suppressed
+    if(!suppressed){
+        uint16_t height = file.read() * 256; //First byte is height * 256
+        height += file.read(); //Second byte is more height
+        wake();
+        //While there are still lines to print
+        while(height != 0){
+            //Print up to 255 lines per chunk
+            uint8_t chunk_height = 255;
+            //If there are less than 255 lines left, the chunk will be exactly the height remaining
+            if(height < 255){
+            chunk_height = height;
+            }
 
-		//Write full-width bitmap
-		write_bytes(ASCII_DC2, '*', chunk_height, 48);
+            //Write full-width bitmap
+            write_bytes(ASCII_DC2, '*', chunk_height, 48);
 
-		//For each line, write the next 48 bytes
-		for(int i = 0; i < (chunk_height * 48); i++){
-		write_bytes(file.read());
-		}
+            //For each line, write the next 48 bytes
+            for(int i = 0; i < (chunk_height * 48); i++){
+            write_bytes(file.read());
+            }
 
-		//Height remaining = last height remaining - how much we printed this chunk
-		height = height - chunk_height;
-	}
+            //Height remaining = last height remaining - how much we printed this chunk
+            height = height - chunk_height;
+        }
+        feed(feed_amount);
+	    sleep();
 
-	_print_callback("<IMAGE>");
+    }else{
+        //Print blank lines to the callback for each feed amount
+        for(int i = 0; i < feed_amount; i++){
+            _print_callback("");
+        }
 
-	feed(feed_amount);
-	sleep();
+    }
 
 }
 

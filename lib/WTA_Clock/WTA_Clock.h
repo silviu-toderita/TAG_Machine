@@ -14,20 +14,19 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 #include "Arduino.h"
-#define NTP_CLOCK_AUTO -1
 
-class NTP_Clock{
+class WTA_Clock{
     public:
 
-        NTP_Clock();
+        WTA_Clock();
 
         void
-            config(String, uint16_t, int16_t, uint16_t),
+            config(uint16_t),
+            begin(),
             handle();
 
         bool 
             status(),
-            begin(),
             get_timezone();
 
         uint16_t 
@@ -60,5 +59,13 @@ class NTP_Clock{
 
         uint32_t 
             get_UNIX_time();
+
+    uint16_t request_interval; //Frequency of NTP requests in seconds
+    uint64_t last_response_millis; //Time of last NTP response
+    uint32_t time_at_last_response = 0; //UNIX Time at last NTP response
+
+    int16_t timezone_offset = 0; //Offset from UTC in minutes
+
+    uint32_t external_UNIX_time = 0; //Holds value of UNIX timestamp passed to class from external source
 
 };

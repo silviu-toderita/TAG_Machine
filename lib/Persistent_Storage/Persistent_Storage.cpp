@@ -4,14 +4,14 @@
 
     To use, initialize an object with the filename you'd like to use. Use put() to
     store or change a key:value pair, and get() to retrieve a value based on the
-    key. Use remove() to delete a key:value pair. 
+    key.
     
     Keys or values may not contain line breaks or the character ":", and they are
     removed automatically when using put().
     
     For human readability, the file is stored as a .txt and // can be used to 
     comment within the value only. get() will not return anything after // or any 
-    spaces after the value.
+    trailing spaces.
 
     Created by Silviu Toderita in 2020.
     silviu.toderita@gmail.com
@@ -19,16 +19,13 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 #include "Persistent_Storage.h"
-#include "FS.h" //SPI Flash File System (SPIFFS) Library
-
-String filename; //The filename for this object
-bool file_exists = false; //True if the file exists, false if it does not
 
 /*  Persistent_Storage Constructor
         filename_in: The filename to use 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Persistent_Storage::Persistent_Storage(String filename_in){
-    filename = filename_in;
+    filename = "/" + filename_in + ".txt";
+    SPIFFS.begin();
 }
 
 /*  (private) remove_reserved_characters
@@ -65,20 +62,22 @@ String remove_spaces_and_comments(String input){
 
     //If the input text contains "//"", comments_removed contains everything up to that 
     String comments_removed;
+    //If // cannot be found, no comments need to be removed
     if(input.indexOf("//") == -1){
         comments_removed = input;
+    //Otherwise, remove anything before the //
     }else{
         comments_removed = input.substring(0, input.indexOf("//")); 
     }
 
     //Go through every character and store the last character that wasn't a space
-    uint16_t last_character = 0;
+    int16_t last_character = -1;
     for(uint16_t i = 0; i < comments_removed.length(); i++){
         if(comments_removed.charAt(i) != ' ' && comments_removed.charAt(i) != '\t') last_character = i;
     }
 
     //If the string has no characters or all spaces, return ""
-    if(last_character == 0){
+    if(last_character == -1){
         return "";
     //Return the characters without the spaces on the end
     }else{
@@ -91,9 +90,9 @@ String remove_spaces_and_comments(String input){
         key:
         value:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Persistent_Storage::put(String key, String value){
+bool Persistent_Storage::put(String key, String value){
     //If the key is blank, it can't be stored
-    if(key == "") return;
+    if(key == "") return false;
 
     //Process the key and the value by removing reserved characters
     String processed_key = remove_reserved_characters(key);
@@ -106,20 +105,20 @@ void Persistent_Storage::put(String key, String value){
         file_exists = true;
 
         //If the file does not exist, create it and write the key:value pair
-        if(!SPIFFS.exists("/" + filename + ".txt")){
-            File file = SPIFFS.open("/" + filename + ".txt", "w");
+        if(!SPIFFS.exists(filename)){
+            File file = SPIFFS.open(filename, "w");
 
             file.print(processed_key + ":" + processed_value + "\n");
             file.close();
 
-            return;
+            return true;
         } 
 
     }
 
     //Open the current file for reading and a new file for writing
-    File current_file = SPIFFS.open("/" + filename + ".txt", "r");
-    File new_file = SPIFFS.open("/" + filename + "NEW.txt", "w"); 
+    File current_file = SPIFFS.open(filename, "r");
+    File new_file = SPIFFS.open(filename + "n", "w"); 
 
 
     bool found_key = false;
@@ -148,7 +147,7 @@ void Persistent_Storage::put(String key, String value){
 
     //Close the current file and delete it
     current_file.close();
-    SPIFFS.remove("/" + filename + ".txt");
+    SPIFFS.remove(filename);
     
     //If the key was not found in the file, add the new key:value pair to the end of the new file
     if(!found_key){
@@ -157,23 +156,25 @@ void Persistent_Storage::put(String key, String value){
 
     //Close the new file and rename it to the current name
     new_file.close(); 
-    SPIFFS.rename("/" + filename + "NEW.txt","/" + filename + ".txt");
+    SPIFFS.rename(filename + "n",filename);
+
+    return true;
 }
 
-/*  get: Get the value of a specific key 
+/*  get_value: Get the value of a specific key 
         key:
-    RETURNS Value of the key. If the key is not found, returns "%NF".
+    RETURNS Value of the key. If the key is not found, returns "".
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-String Persistent_Storage::get(String key){
+String Persistent_Storage::get_value(String key){
     //If the file does not exist, the key does not exist
-    if(!SPIFFS.exists("/" + filename + ".txt")) return "";
+    if(!SPIFFS.exists(filename)) return "";
 
     //Remove any reserved characters from the key
     String processed_key = remove_reserved_characters(key);
     String value = "";
 
     //Open the file for reading
-    File file = SPIFFS.open("/" + filename + ".txt", "r");
+    File file = SPIFFS.open(filename, "r");
     
     //Read through each line of the file
     while(file.position() < file.size() - 1){
@@ -193,19 +194,39 @@ String Persistent_Storage::get(String key){
 
 }
 
-/*  delete: Removes a key:value pair based on the key
+/*  get_key: Get a specific key
+        id: the index of the key
+    RETURNS The key or "" if the file or key is not found
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+String Persistent_Storage::get_key(uint16_t id){
+    //If there is no file, return nothing
+    if(!SPIFFS.exists(filename)) return "";
+
+    File file = SPIFFS.open(filename, "r");
+    
+    //Skip lines until the id is reached
+    for(int i = 0; i < id; i++){
+        file.readStringUntil('\n');
+    }
+    //The key is the first part of the line, until the colon
+    String key = file.readStringUntil(':');
+    file.close();
+    return key;
+}
+
+/*  remove: Removes a key:value pair based on the key
         key:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Persistent_Storage::remove(String key){
     //If the file does not exist, the key does not exist
-    if(!SPIFFS.exists("/" + filename + ".txt")) return;
+    if(!SPIFFS.exists(filename)) return;
 
     //Remove any reserved characters from the key
     String processed_key = remove_reserved_characters(key);
 
     //Open the current file for reading and a new file for writing
-    File current_file = SPIFFS.open("/" + filename + ".txt", "r");
-    File new_file = SPIFFS.open("/" + filename + "NEW.txt", "w"); 
+    File current_file = SPIFFS.open(filename, "r");
+    File new_file = SPIFFS.open(filename + "n", "w"); 
 
     //Loop until the current file has been read completely
     while(current_file.position() < current_file.size() - 1){
@@ -226,14 +247,33 @@ void Persistent_Storage::remove(String key){
 
     //Close the current file and delete it
     current_file.close();
-    SPIFFS.remove("/" + filename + ".txt");
+    SPIFFS.remove(filename);
 
     //Close the new file and rename it to the current name
     new_file.close(); 
-    SPIFFS.rename("/" + filename + "NEW.txt","/" + filename + ".txt");
+    SPIFFS.rename(filename + "n",filename);
 
 }
 
-bool Persistent_Storage::exists(){
-    return SPIFFS.exists("/" + filename + ".txt");
+/*  get_number_entries: Get the number of key:value pairs
+    RETURNS number of key:value pairs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+uint16_t Persistent_Storage::get_number_entries(){
+    //If the file does not exist, return 0
+    if(!SPIFFS.exists(filename)) return 0;
+
+    File file = SPIFFS.open(filename, "r");
+
+    //Read to the first colon
+    file.readStringUntil(':');
+
+    uint16_t count = 0;
+    //Loop until each colon has been counted
+    while(file.position() < file.size() - 1){
+        file.readStringUntil(':');
+        count++;
+    }
+
+    file.close();
+    return count;
 }

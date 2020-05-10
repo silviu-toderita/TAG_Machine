@@ -19,4 +19,8 @@ class Twilio {
         String 
             get_auth_header(String, String);
             
+        //Account ID, Twilio fingerprint, and auth header created from account ID and auth token
+        String account_sid;
+        String fingerprint;
+        String auth_header;
 };

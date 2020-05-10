@@ -9,7 +9,7 @@
 #define ASCII_GS   29 
 
 //Define void callback function type with a single String arg
-typedef void (*voidFuncPtr)(const String input);
+typedef void (*voidFuncPtrStr)(const String input);
 
 class Thermal_Printer{
     public:
@@ -18,7 +18,7 @@ class Thermal_Printer{
 
         void    
             config(uint32_t, uint8_t),
-            begin(voidFuncPtr),
+            begin(voidFuncPtrStr),
             begin(),
             set_printing_parameters(uint8_t, uint8_t, uint8_t),
             set_printing_density(uint8_t, uint8_t),
@@ -31,7 +31,7 @@ class Thermal_Printer{
             print_message(String, uint8_t),
             print_error(String, uint8_t),
             print_line(uint8_t, uint8_t),
-            print_bitmap_file(File, uint8_t),
+            print_bitmap_file(File, uint8_t, String),
             print_bitmap_http(String, uint8_t),
             feed(uint8_t);
 
@@ -55,6 +55,12 @@ class Thermal_Printer{
 
         String  
             wrap(String, uint8_t);
+
+        uint32_t baud_rate = 0; //Baud rate of printer
+        uint8_t DTR_pin = 0; //ESP8266 pin to use to detect DTR
+
+        uint8_t printMode = 0; //printMode byte holds inverse, double height, double width, and bold font status
         
+        bool suppressed = false; //When printer is suppressed, it won't print but callback will still be called
 
 };

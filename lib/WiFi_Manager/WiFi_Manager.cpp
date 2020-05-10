@@ -65,8 +65,6 @@ void WiFi_Manager::set_callbacks(void_function_pointer connected_callback, void_
     _connection_failed_callback = connection_failed_callback;
 }
 
-
-
 /*  (private) connect: Attempt to connect to a network
         ID: ID of network to attempt connection to
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
