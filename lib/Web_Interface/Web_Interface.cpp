@@ -32,7 +32,6 @@ WebSocketsServer websockets_server = WebSocketsServer(81); //Create a websockets
 static void_function_pointer _offline; //Callback function when connected
 
 int8_t websockets_client = -1; //Current websockets client number connected to (-1 is none)
-bool persistent_console; //Flag to persist console data when not on console page
 
 /*  (private) get_content_type: Returns the HTTP content type based on the extension
         filename: 
@@ -85,6 +84,14 @@ bool handle_file_read(String path){
         return true;
     }
 
+    //If the file exists, stream it to the client
+    if(SPIFFS.exists(path.substring(4))){
+        File file = SPIFFS.open(path.substring(4), "r");                
+        server.streamFile(file, content_type);
+        file.close();                                    
+        return true;
+    }
+
     return false;                                         
 }
 
@@ -109,8 +116,8 @@ void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
             //Store the client number
             websockets_client = num;
 
-            //If persistent_console is true and the console file exists...
-            if(persistent_console && SPIFFS.exists("/www/console.txt")){
+            //If the console file exists...
+            if(SPIFFS.exists("/www/console.txt")){
                 //Open the console.txt file in read mode and send it to the client
                 File console = SPIFFS.open("/www/console.txt", "r");
                 String console_text = console.readString();
@@ -139,19 +146,79 @@ void handle_settings_get(){
     if(settings_template_entries == 0){
         response = "<h3>No Settings Defined!</h3>";
     }
-    
+
     //For each setting...
     for(int i = 0; i < settings_template_entries; i++){
         //Get the setting name from the settings template
         String key = settings_template.get_key(i);
-        //Get the setting value
-        String value = settings.get_value(key);
 
         //Form the HTML response
         response += "<div class=\"form-group\">";
-        response +=     "<label for=\"" + key + "\">" + key + "</label>";
-        response +=     "<input type=\"text\" class=\"form-control\" id=\"" + key + "\" name=\"" + key + "\" value=\"" + value + "\">";
-        response += "</div>";
+        
+        String input_type = settings_template.get_sub_value(key, 0);
+
+        if(input_type == "label"){
+            response +=     "<hr/>";
+            response +=     "<h2>" + settings_template.get_sub_value(key, 1) + "</h2>";
+        }else{
+            response +=     "<label for=\"" + key + "\">" + settings_template.get_sub_value(key, 1) + "</label>";
+            if(input_type == "number"){
+                response +=     "<input type=\"number\" ";
+            }else if(input_type == "password"){
+                response +=     "<input type=\"password\" ";
+            }else if(input_type == "URL"){
+                response +=     "<input type=\"url\" ";
+            }else if(input_type == "number"){
+                response +=     "<input type=\"number\" ";
+            }else if(input_type == "multi" || input_type == "bool"){
+                response +=     "<select ";
+            }else{
+                response +=     "<input type=\"text\" ";
+            }
+
+            response +=     "class=\"form-control\" id=\"" + key + "\" name=\"" + key + "\" aria-describedby=\"" + key +"help\" ";
+
+            String settings_value = settings.get_value(key);
+
+            if(input_type == "multi" || input_type == "bool"){
+                response += ">";
+
+                if(input_type == "multi"){
+                    for(int i = 4; i < settings_template.get_number_values(key); i++){
+                        String this_value = settings_template.get_sub_value(key, i);
+                        response += "<option value=\"" + this_value + "\"";
+                        if(this_value == settings_value){
+                            response += "selected";
+                        }
+                        response +=">" + this_value + "</option>";
+                    }
+                }else{
+                    bool is_true = false;
+                    if(settings_value == "true") is_true = true;
+
+                    response += "<option value=\"true\"";
+                    if(is_true){
+                        response += "selected";
+                    }
+                    response +=">Yes</option>";
+
+                    response += "<option value=\"false\"";
+                    if(!is_true){
+                        response += "selected";
+                    }
+                    response +=">No</option>";
+                }
+                
+                response += "</select>";
+            }else{
+                response += "value=\"" + settings_value + "\">";
+            }
+            
+            response +=     "<small id=\"" + key + "help\" class=\"form-text text-muted\">" + settings_template.get_sub_value(key, 2) + "</small>";
+            response += "</div>";
+
+        }
+
         
     }
 
@@ -179,15 +246,6 @@ void handle_settings_post(){
 /*  Web_Interface Constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Web_Interface::Web_Interface(){
-    config(true);
-}
-
-/*  config
-        persistent_console_in: Set true to persist console when console page is
-            not open (default: false)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Web_Interface::config(bool persistent_console_in){
-    persistent_console = persistent_console_in; 
 }
 
 /*  set_callback: Set the callback function to take tag machine offline safely before restarting
@@ -206,6 +264,7 @@ bool check_settings_file(){
 
     //The number of settings in the settings template
     uint8_t template_entries = settings_template.get_number_entries();
+    if(template_entries == 0) return false;
 
     //For each setting in the setting template...
     for(int i = 0; i < template_entries; i++){
@@ -214,13 +273,18 @@ bool check_settings_file(){
         //If this particular setting is blank...
         if(settings.get_value(key) == ""){
             //Get the value of the default
-            String template_value = settings_template.get_value(key);
+            String this_value = settings_template.get_sub_value(key, 3);
             //If there is no default but the setting is required, it's not valid
-            if(template_value == "REQ"){
+            if(this_value == "_REQ"){
                 is_valid = false;
             //Otherwise, just store the default value
             }else{
-                settings.put(key, template_value);
+                if(settings_template.get_sub_value(key, 0) == "multi"){
+                    settings.put(key, settings_template.get_sub_value(key, this_value.toInt() + 4));
+                }else{
+                    settings.put(key, this_value);
+                }
+                
             }
         }
     }
@@ -234,8 +298,8 @@ bool check_settings_file(){
 bool Web_Interface::begin(){
 
     //When the settings file is requested or posted, call the corresponding function
-    server.on("/settings.txt", HTTP_POST, handle_settings_post);
-    server.on("/settings.txt", HTTP_GET, handle_settings_get);
+    server.on("/settings_data", HTTP_POST, handle_settings_post);
+    server.on("/settings_data", HTTP_GET, handle_settings_get);
 
     //If any other file is requested, send it if it exists or send a generic 404 if it doesn't exist
     server.onNotFound([](){
@@ -275,24 +339,22 @@ void Web_Interface::console_print(String output){
     if(websockets_client != -1){
         websockets_server.sendTXT(websockets_client, output);
     }
-    
-    //If persistent_console is true, append the text to the console file
-    if(persistent_console){
-        //Open/create the console.txt file in append mode
-        File console = SPIFFS.open("/www/console.txt", "a");
 
-        //If the console file is over 10kb, delete it and create a new one. 
-        if(console.size() > 10000){
-            console.close();
-            SPIFFS.remove("/www/console.txt");
-            console = SPIFFS.open("/www/console.txt", "w");
-        }
+    //Open/create the console.txt file in append mode
+    File console = SPIFFS.open("/www/console.txt", "a");
 
-        //output the current string to the end of the file
-        console.print(output); 
-        //Close the file
+    //If the console file is over 10kb, delete it and create a new one. 
+    if(console.size() > 10000){
         console.close();
+        SPIFFS.remove("/www/console.txt");
+        console = SPIFFS.open("/www/console.txt", "w");
     }
+
+    //output the current string to the end of the file
+    console.print(output); 
+    //Close the file
+    console.close();
+
     
 
 }

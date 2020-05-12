@@ -1,12 +1,19 @@
-phone_number:REQ
-owner_name:User
-printer_baud:9600
-printer_DTR_pin:13
-button_pin:5
-LED_pin:4
-WiFi_SSID:REQ
-WiFi_password:
-Twilio_account_sid:REQ
-Twilio_auth_token:REQ
-Twilio_fingerprint:BC B0 1A 32 80 5D E6 E4 A2 29 66 2B 08 C8 E0 4C 45 29 3F D0
-MQTT_address:REQ
+phone_number;text;Phone Number;;_REQ
+owner_name;text;Owner Name;;User
+WiFi_SSID;text;WiFi Network;Your WiFi network;_REQ
+WiFi_password;password;WiFi Password;Your WiFi password;
+Twilio_account_SID;text;Twilio Account SID;The SID for your Twilio account. Get this from your Twilio dashboard.;_REQ
+Twilio_auth_token;text;Twilio Auth Token;The Auth Token for your Twilio account. Get this from your Twilio dashboard.;_REQ
+MQTT_address;text;MQTT Broker URL;The URL of the MQTT broker used to relay messages.;_REQ
+send_replies;bool;Send SMS Replies;Send SMS replies requesting a name for the phone book.;true
+advanced;label;Advanced Settings;;
+device_name;text;Device Name;A custom name for this device to be used for the web interface URL, the hotspot SSID, and wireless update username.;tagmachine
+device_password;password;Device Password;The password for this device to be used for the hotspot and wireless update passwords;12345678
+printer_baud;multi;Printer Baud Rate;The baud rate of the thermal printer. To get this, start the printer while holding down the button on the printer panel.;0;9600;19200;28800;38400;57600;76800;115200
+printer_heating_dots;number;Printer Heating Dots;Maximum number of heating dots to use simultaneously (0-47). Higher = faster print speed, but higher current draw and possible crashing.;11
+printer_heating_time;number;Printer Heating Time;Amount of time to heat each line in 10us increments (3-255). Higher = darker print, but slower print speed and possible sticking paper.;120
+printer_heating_interval;number;Printer Heating Interval;Amount of time between heating each line in 10us increments (0-255). Higher = Clearer print, but slower print speed.;60
+printer_DTR_pin;multi;Printer DTR Pin;The ESP pin used for the printer DTR (Data Terminal Ready).;9;0;1;2;3;4;5;9;10;12;13;14;15;16
+button_pin;multi;Button Pin;The ESP pin used for the button ground.;5;0;1;2;3;4;5;9;10;12;13;14;15;16
+LED_pin;multi;LED Pin;The ESP pin used for the LED ground.;4;0;1;2;3;4;5;9;10;12;13;14;15;16
+Twilio_fingerprint;text;Twilio Fingerprint;The SHA1 fingerprint of api.twilio.com. If this changes, you can get the new fingerprint from the SSL certificate of api.twilio.com.;BC B0 1A 32 80 5D E6 E4 A2 29 66 2B 08 C8 E0 4C 45 29 3F D0

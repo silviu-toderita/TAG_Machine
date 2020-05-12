@@ -15,7 +15,11 @@ class Persistent_Storage{
 
         String 
             get_key(uint16_t),
-            get_value(String);
+            get_value(String),
+            get_sub_value(String, uint8_t);
+
+        uint8_t 
+            get_number_values(String);
 
         uint16_t
             get_number_entries();

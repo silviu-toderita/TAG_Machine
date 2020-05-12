@@ -58,13 +58,11 @@ bool Twilio::send_message(String to, String from, String message)
     "&Body=" + encoded_message;
 
     // Construct headers and post body manually
-    String http_request = "POST /2010-04-01/Accounts/" +
-                            String(account_sid) + "/Messages HTTP/1.1\r\n" +
+    String http_request = "POST /2010-04-01/Accounts/" + String(account_sid) + "/Messages HTTP/1.1\r\n" +
                             auth_header + "\r\n" + "Host: " + host + "\r\n" +
                             "Cache-control: no-cache\r\n" +
-                            "User-Agent: ESP8266 Twilio Example\r\n" +
-                            "Content-Type: " +
-                            "application/x-www-form-urlencoded\r\n" +
+                            "User-Agent: TAG Machine\r\n" +
+                            "Content-Type: application/x-www-form-urlencoded\r\n" +
                             "Content-Length: " + post_data.length() +"\r\n" +
                             "Connection: close\r\n" +
                             "\r\n" + post_data + "\r\n";

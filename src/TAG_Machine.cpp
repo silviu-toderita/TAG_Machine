@@ -116,16 +116,16 @@ void process_message(String time, String from_number, String message, String med
 
     //If the message is ".photo", change photo_mode to true so that the photo is printed by itself
     bool photo_mode = false;
-    if(message == ".photo"){
+    if(message == "_photo"){
         photo_mode = true;
     
     //If the message is ".name", reply with a name update message
-    }else if(message == ".name"){
+    }else if(message == "_name"){
 
         //If the reply was successfully sent...
-        if(twilio.send_message(from_number, "16043739569", "Please reply with a new name within 24hrs to add it to the phone book.")){
+        if(twilio.send_message(from_number, phone_number, "Please reply with a new name within 24hrs to add it to the phone book.")){
             //Store the timestamp when the request was sent out
-            phone_book.put(from_number, "%REQ" + time);
+            phone_book.put(from_number, "_REQ" + time);
         }
 
         //Exit function before printing
@@ -139,14 +139,15 @@ void process_message(String time, String from_number, String message, String med
     if(name == ""){
         request_name = true;
     //If a name was requested already and the reply message isn't blank...
-    }else if(name.substring(0,4) == "%REQ" && message != ""){
-
+    }else if(name.substring(0,4) == "_REQ" && message != ""){
+        console(from_number);
+        console(phone_number);
         //If the request is less than 24 hours old...
         if(time.toInt() <= name.substring(4).toInt() + 86400){
             //Store the name in the phone book
             phone_book.put(from_number, message);
             //Reply with a success message
-            twilio.send_message(from_number, "16043739569", "Thanks " + message + ", your name has been added to the phone book. To change your name, reply with \".name\".");
+            twilio.send_message(from_number, phone_number, "Thanks " + message + ", your name has been added to the phone book. To change your name, reply with \"_name\".");
     
             //exit the function before printing
             return;
@@ -161,9 +162,9 @@ void process_message(String time, String from_number, String message, String med
     //If request name is true...
     if(request_name){
         //Send a message asking the sender to reply with a name. If the reply is successful...
-        if(twilio.send_message(from_number, "16043739569", "Thanks for messaging Silviu's Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
+        if(twilio.send_message(from_number, phone_number, "Thanks for messaging " + owner_name + "'s Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
             //Store the timestamp when the request was sent out
-            phone_book.put(from_number, "%REQ" + time);
+            phone_book.put(from_number, "_REQ" + time);
         }
         //Use the phone number as the name for this message
         name = from_number;
@@ -202,7 +203,7 @@ void process_message(String time, String from_number, String message, String med
             //If it's an unsupported attachment, print that out and reply to the sender
             if(media_filename[i] == "NS"){
                 printer.print_message("<UNSUPPORTED ATTACHMENT>", 1);
-                twilio.send_message(from_number, "16043739569", "Sorry, but your message contained media in a format that's not supported by the TAG Machine. Only .jpg, .png, and .gif images are supported.");
+                twilio.send_message(from_number, phone_number, "Sorry, but your message contained media in a format that's not supported by the TAG Machine. Only .jpg, .png, and .gif images are supported.");
             //Otherwise, print that particular media file
             }else{
                 printer.print_bitmap_http("http://silviutoderita.com/img/" + media_filename[i] + ".dat", 1);
@@ -322,6 +323,7 @@ void connected(){
     //If the connection to the MQTT broker is unssuccessful, print an error and let the user know connection will continue to be attempted automatically
     if(!connect_to_MQTT()){
         printer.print_error("Unable to connect to message server! Check your internet connection.", 0);
+        printer.print_status(MQTT_address, 0);
         printer.print_status("Attempting to connect...", 2);
     } 
 
@@ -374,7 +376,7 @@ void load_settings(){
 
     printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt());
     WiFi_manager.add_network(web_interface.load_setting("WiFi_SSID"),web_interface.load_setting("WiFi_password"));
-    twilio.config(web_interface.load_setting("Twilio_account_sid"), web_interface.load_setting("Twilio_auth_token"), web_interface.load_setting("Twilio_fingerprint"));
+    twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"), web_interface.load_setting("Twilio_fingerprint"));
 
 }
 
@@ -471,8 +473,8 @@ void setup() {
         bootloader(false);
     //If the settings file is invalid, start the bootloader with the web interface running
     }else if(!settings_valid){
+        console("ERROR: Settings is missing one or more required values! Navigate to the Settings page and complete all required settings.");
         bootloader(true);
-        console("WARNING: Settings is missing one or more required values!");
     }
 
     //Initialize the printer with the callback function for printing to the console
@@ -497,7 +499,7 @@ void setup() {
     printer.print_bitmap_file(file, 2, "TAG MACHINE");
     file.close();
 
-    //Set MQTT server
+    if(MQTT_address.substring(0, 7) == "http://") MQTT_address = MQTT_address.substring(7);
     MQTT_client.setServer(MQTT_address.c_str(), 1883);
     //Set callback for incoming message from MQTT
     MQTT_client.setCallback(new_message);

@@ -7,33 +7,37 @@
         <title> TAG Machine </title>
 
         <!--Load Bootstrap-->
-        <link rel='stylesheet' href='lib/bs.css'>
+        <link rel='stylesheet' href='/lib/bs.css'>
         <!--Load jQuery-->
-        <script src="lib/jq.js"></script>
+        <script src="/lib/jq.js"></script>
         <!--Load Bootstrap Javascript (includes Popper)-->
-        <script src="lib/bs.js"></script>
+        <script src="/lib/bs.js"></script>
 
         <!--Load Javascript-->
         <script>
             //Load the navbar
-            $.get("nav.html", function(data){
+            $.get("/nav.html", function(data){
                 $("#navigation").replaceWith(data);
             });
 
             //Load the settings form
-            $.get("settings.txt", function(data){
+            $.get("/settings_data", function(data){
                 $("#settings").replaceWith(data);
-            });
 
-            $(document).ready(function(){
                 //When the submit button is clicked, the settings form is POSTed to the ESP and an alert is displayed in the browser
-                $('#submit-button').click(function(){
-                    $.post("settings.txt", $("#settings-form").serialize(), function(data){
+                $("#settings-form").submit(function(event){
+                    event.preventDefault();
+                    $("#submit-button").html("Saving...");
+                    $("#submit-button").prop('disabled', true);
+                    $.post("/settings_data", $("#settings-form").serialize(), function(data){
                         alert("Settings Updated! TAG Machine is Restarting...");
+                        $("#submit-button").html("Save and Restart");
+                        $("#submit-button").prop('disabled', false);
                     });
                 });
             });
 
+            
             
         </script>
 
@@ -47,10 +51,11 @@
         <main class="container">
             <header class="page-header header container">
                 <h2>Settings</h2>
+                <br>
             </header>
             
             <!--Settings Area-->
-            <form id="settings-form" name="settings-form">
+            <form id="settings-form" name="settings-form" style="max-width: 600px;">
                 <!--This will be replaced with the dynamic settings form-->
                 <div id="settings">
                     Loading Settings...
@@ -58,6 +63,7 @@
 
                 <!--Submit Button-->
                 <button type="submit" class="btn btn-dark float-right" id="submit-button">Save and Restart</button>
+                <br>
             </form>
         </main>
         

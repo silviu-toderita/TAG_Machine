@@ -52,7 +52,7 @@ void Thermal_Printer::begin(voidFuncPtrStr print_callback){
 
 	//Set default printing parameters
 	set_printing_parameters(11, 120, 60);
-	set_printing_density(10, 2);
+    write_bytes(ASCII_DC2, '#', (2 << 5) | 10);
 
 	//Set DTR pin and enable printer flow control
 	pinMode(DTR_pin, INPUT_PULLUP);
@@ -74,7 +74,7 @@ void Thermal_Printer::begin(){
 			from 8-384. Default is 11. Higher = faster print speed, higher current 
 			draw.
 		heating_time: (3-255) Amount of time to heat each line (x10uS). Default is 
-			100. Higher = darker print, slower print, possibility of sticking paper.
+			120. Higher = darker print, slower print, possibility of sticking paper.
 		heating_interval: (0-255) Amount of time between heating each line (x10uS). 
 			Default is 60. Higher = Clearer print, slower print speed, less current 
 			draw.
@@ -82,16 +82,6 @@ void Thermal_Printer::begin(){
 void Thermal_Printer::set_printing_parameters(uint8_t heating_dots, uint8_t heating_time, uint8_t heating_interval){
 	write_bytes(ASCII_ESC, '7');
 	write_bytes(heating_dots, heating_time, heating_interval);
-}
-
-/*	set_printing_density
-		print_density: (0-31) Printing density (50% + printing_density x 5%), can go
-			over 100%. Default is 10. Higher = denser print, but can get 
-			oversaturated.
-		print_break_time: (0-7) Printing break time (x250uS). Default is 2.
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::set_printing_density(uint8_t print_density, uint8_t print_break_time){
-  	write_bytes(ASCII_DC2, '#', (print_break_time << 5) | print_density);
 }
 
 /*	offline: Turns off the printer, to be called before a function that might spit

@@ -21,7 +21,6 @@ class Thermal_Printer{
             begin(voidFuncPtrStr),
             begin(),
             set_printing_parameters(uint8_t, uint8_t, uint8_t),
-            set_printing_density(uint8_t, uint8_t),
             suppress(bool),
             offline(),
             

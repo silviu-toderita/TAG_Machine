@@ -13,7 +13,6 @@ class Web_Interface{
     
         void 
             set_callback(void_function_pointer),
-            config(bool),
             handle(),
             console_print(String);
 

@@ -120,7 +120,6 @@ uint8_t WTA_Clock::get_leap_years(){
     return (get_UNIX_time() - 1483228800) / 126230400; //(Current time - time@Jan 1, 2017) / Seconds in 4 years
 }
 
-
 /*  get_year
     RETURNS current year
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
