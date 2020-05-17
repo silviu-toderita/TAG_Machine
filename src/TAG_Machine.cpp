@@ -9,6 +9,7 @@
 
 #include "Arduino.h" //Arduino Library
 #include "EEPROM.h" //EEPROM Library
+#include "Persistent_Storage.h"
 
 //Network Libraries
 #include "WiFi_Manager.h" //Silviu's WiFi Manager Library
@@ -112,7 +113,7 @@ String format_NA_phone_numbers(String input){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void process_message(String time, String from_number, String message, String media){
     //Get the name from the phone book
-    String name = phone_book.get_value(from_number);
+    String name = phone_book.get(from_number);
 
     //If the message is ".photo", change photo_mode to true so that the photo is printed by itself
     bool photo_mode = false;
@@ -125,7 +126,7 @@ void process_message(String time, String from_number, String message, String med
         //If the reply was successfully sent...
         if(twilio.send_message(from_number, phone_number, "Please reply with a new name within 24hrs to add it to the phone book.")){
             //Store the timestamp when the request was sent out
-            phone_book.put(from_number, "_REQ" + time);
+            phone_book.set(from_number, "_REQ" + time);
         }
 
         //Exit function before printing
@@ -140,12 +141,10 @@ void process_message(String time, String from_number, String message, String med
         request_name = true;
     //If a name was requested already and the reply message isn't blank...
     }else if(name.substring(0,4) == "_REQ" && message != ""){
-        console(from_number);
-        console(phone_number);
         //If the request is less than 24 hours old...
         if(time.toInt() <= name.substring(4).toInt() + 86400){
             //Store the name in the phone book
-            phone_book.put(from_number, message);
+            phone_book.set(from_number, message);
             //Reply with a success message
             twilio.send_message(from_number, phone_number, "Thanks " + message + ", your name has been added to the phone book. To change your name, reply with \"_name\".");
     
@@ -164,7 +163,7 @@ void process_message(String time, String from_number, String message, String med
         //Send a message asking the sender to reply with a name. If the reply is successful...
         if(twilio.send_message(from_number, phone_number, "Thanks for messaging " + owner_name + "'s Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
             //Store the timestamp when the request was sent out
-            phone_book.put(from_number, "_REQ" + time);
+            phone_book.set(from_number, "_REQ" + time);
         }
         //Use the phone number as the name for this message
         name = from_number;
@@ -327,9 +326,6 @@ void connected(){
         printer.print_status("Attempting to connect...", 2);
     } 
 
-    //If an OTA update was just completed, printing can now restart
-    printer.suppress(false); 
-
     //The WiFi connection has not yet failed
     WiFi_connection_failed = false;
 
@@ -367,9 +363,9 @@ void create_hotspot(){
 /*  load_settings: Load the settings from the settings file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void load_settings(){
-
     phone_number = web_interface.load_setting("phone_number");
-    owner_name = web_interface.load_setting("owner_name");;
+    console(web_interface.load_setting("phone_number"));
+    owner_name = web_interface.load_setting("owner_name");
     MQTT_address = web_interface.load_setting("MQTT_address");
     button_pin = web_interface.load_setting("button_pin").toInt();
     LED_pin = web_interface.load_setting("LED_pin").toInt();
@@ -377,14 +373,43 @@ void load_settings(){
     printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt());
     WiFi_manager.add_network(web_interface.load_setting("WiFi_SSID"),web_interface.load_setting("WiFi_password"));
     twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"), web_interface.load_setting("Twilio_fingerprint"));
+}
 
+/*  offline: Take SPIFFS and printer offline ahead of restart, to avoid file system corruption and garbage printer output
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void offline(){
+    //Disable SPIFFS
+    SPIFFS.end();
+    //Disable the printer so there is no garbage output
+    printer.offline();
+}
+
+void init_basics(){
+    //Initialize the button and LED pins
+    pinMode(button_pin, INPUT_PULLUP);
+    pinMode(LED_pin, OUTPUT);
+    digitalWrite(LED_pin, LOW); 
+    
+    //Start the multicast DNS with the device_name as the address
+    MDNS.begin(device_name);
+
+    //Start the OTA updater using the device_name as the hostname and device_password as the password
+    ArduinoOTA.setHostname(device_name.c_str()); 
+    ArduinoOTA.setPassword(device_password.c_str()); 
+    //When an OTA update starts...
+    ArduinoOTA.onStart([](){
+        //Take the printer offline
+        offline();
+    });
+    //Begin listening for OTA updates
+    ArduinoOTA.begin();
 }
 
 /*  bootloader: Go into bootloader mode
         web_interface_on: Specifies if the web interface should be on to see the console and update settings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void bootloader(bool web_interface_on){
-
+    init_basics();
     //Create a hotspot
     WiFi_manager.create_hotspot(device_name, device_password);
 
@@ -417,62 +442,31 @@ void bootloader(bool web_interface_on){
 
 }
 
-/*  offline: Take SPIFFS and printer offline ahead of restart, to avoid file system corruption and garbage printer output
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void offline(){
-    //Disable SPIFFS
-    SPIFFS.end();
-    //Disable the printer so there is no garbage output
-    printer.offline();
-}
-
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ####  SETUP  ####
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void setup() {
-    //Start SPIFFS and do garbage collection
-    SPIFFS.begin();
-    SPIFFS.gc();
-    console("TAG Machine Initializing...");
-    //Start the web interface, returns true if the settings file is valid and false if not
-    bool settings_valid = web_interface.begin();
-    //Set the callback function for taking the printer offline before restarting due to settings update
-    web_interface.set_callback(offline);
-    //If the settings are valid, load them
-    if(settings_valid){
-        load_settings();
-        console("Settings loaded successfully!");
-    } 
-
-    //Initialize the button and LED pins
     pinMode(button_pin, INPUT_PULLUP);
-    pinMode(LED_pin, OUTPUT);
-    digitalWrite(LED_pin, LOW); 
-    
-    //Start the multicast DNS with the device_name as the address
-    MDNS.begin(device_name);
-
-    //Initialize the EEPROM with 4 bits
-    EEPROM.begin(4);
-    //Start the OTA updater using the device_name as the hostname and device_password as the password
-    ArduinoOTA.setHostname(device_name.c_str()); 
-    ArduinoOTA.setPassword(device_password.c_str()); 
-    //When an OTA update starts...
-    ArduinoOTA.onStart([](){
-        //Take the printer offline
-        offline();
-        //Write a 0 to address 0 of EEPROM
-        EEPROM.write(0,0);
-        EEPROM.commit();
-    });
-    //Begin listening for OTA updates
-    ArduinoOTA.begin();
-
     //If the button is held down, start the bootloader without the web interface running
     if(!digitalRead(button_pin)){
         bootloader(false);
+    }
+
+    //Start the web interface, returns true if the settings file is valid and false if not
+    bool settings_valid = web_interface.begin();
+
+    console("TAG Machine Initializing...");
+
+    //Set the callback function for taking the printer offline before restarting due to settings update
+    web_interface.set_callback(offline);
+
+    //If the settings are valid, load them
+    if(settings_valid){
+        load_settings();
+        init_basics();
+        console("Settings loaded successfully!");
     //If the settings file is invalid, start the bootloader with the web interface running
-    }else if(!settings_valid){
+    }else{
         console("ERROR: Settings is missing one or more required values! Navigate to the Settings page and complete all required settings.");
         bootloader(true);
     }
@@ -482,17 +476,6 @@ void setup() {
 
     //Set the callback functions for the Wi-Fi Manager
     WiFi_manager.set_callbacks(connected, disconnected, connection_failed);
-
-    //Read the EEPROM to see if an OTA update was just completed...
-    if(EEPROM.read(0) == 0){
-        //Suppress printing until boot finishes
-        printer.suppress(true); 
-        //Write a 1 to 0 address of EEPROM
-        EEPROM.write(0,1); 
-        EEPROM.commit();
-
-        console("OTA Update Successful, Rebooted!");
-    } 
 
     //Print the title
     File file = SPIFFS.open("/logo.dat", "r");

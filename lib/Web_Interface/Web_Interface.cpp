@@ -3,15 +3,21 @@
     -Web console for an ESP that can't be plugged in to use the serial monitor. 
     -Dynamic settings page
 
-    To use, initialize a Web_Interface object and call handle() every loop or as
+    To use, initialize a Web_Interface setting and call handle() every loop or as
     often as possible. Call console_print() to output a line to the console. Place
     files for server in /www/ folder in SPIFFS. 
 
-    To use the settings function, place a settings_template.txt file in the root 
-    of the SPIFFS. Fill the file with settings with the format:
-        setting1:default value //Default value if none specified
-        setting2: //Optional setting
-        setting3:REQ //Required setting with no default
+    To use the settings function, place a settings.txt file in the root 
+    of the SPIFFS. Settings must be in the format of a JSON array, with each object
+    in the array having these possible attributes:
+    "id" (required): a string with no spaces to name each setting
+    "type" (required): text, pass, bool, or multi
+    "name" (required): Human readable name
+    "req" (required): True or False if this setting is required to be filled in.
+    "val": Default value
+    "optx": For multi type, each option must be listed as optx where x is a number
+        from 0 to inifinity in sequence.
+
     begin() will return false if there are any required settings that are missing.
     load_setting() allows you to load a setting based on its name. 
 
@@ -22,16 +28,14 @@
 
 #include "Web_Interface.h"
 
-//Storage objects for settings and settings_template
-Persistent_Storage settings("settings");
-Persistent_Storage settings_template("settings_template");
-
 ESP8266WebServer server(80); //Create a web server listening on port 80
 WebSocketsServer websockets_server = WebSocketsServer(81); //Create a websockets server listening on port 81
 
 static void_function_pointer _offline; //Callback function when connected
 
 int8_t websockets_client = -1; //Current websockets client number connected to (-1 is none)
+
+const String settings_path = "/settings.txt"; //Path to settings file
 
 /*  (private) get_content_type: Returns the HTTP content type based on the extension
         filename: 
@@ -84,7 +88,7 @@ bool handle_file_read(String path){
         return true;
     }
 
-    //If the file exists, stream it to the client
+    //If the file exists in the root folder instead of the /www/ folder, stream it to the client
     if(SPIFFS.exists(path.substring(4))){
         File file = SPIFFS.open(path.substring(4), "r");                
         server.streamFile(file, content_type);
@@ -138,105 +142,158 @@ void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
 /*  (private)handle_settings_get: Send the settings to the browser as an HTML form
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void handle_settings_get(){
-    //Get the number of settings from the template
-    uint16_t settings_template_entries = settings_template.get_number_entries();
+    //Open the settings file
+    File file = SPIFFS.open(settings_path, "r");
+    //Set aside enough memory for a JSON document
+    DynamicJsonDocument doc(file.size() * 2);
+    //Number of settings present in the file
+    uint8_t number_settings = 0;
+
+    //Parse JSON from file
+    DeserializationError error = deserializeJson(doc, file);
+    if(!error){
+        //If there is no issue with the parsing, save the number of settings
+        number_settings = doc.size();
+    } 
+
+    //Close the file
+    file.close();
+
+    //This will hold the HTML response to the browser
     String response;
 
     //Respond with no settings defined if there are none
-    if(settings_template_entries == 0){
+    if(number_settings == 0){
         response = "<h3>No Settings Defined!</h3>";
+        
     }
-
+    
     //For each setting...
-    for(int i = 0; i < settings_template_entries; i++){
-        //Get the setting name from the settings template
-        String key = settings_template.get_key(i);
+    for(int i = 0; i < number_settings; i++){
+        //Create a JsonObject for this setting
+        JsonObject setting = doc[i];
+
+        //Save the setting attributes
+        String id = setting["id"];
+        String type = setting["type"];
+        String name = setting["name"];
+        String desc = "";
+        if(setting.containsKey("desc")) desc = setting["desc"].as<String>();
+        String val = "";
+        if(setting.containsKey("val")) val = setting["val"].as<String>();
 
         //Form the HTML response
         response += "<div class=\"form-group\">";
-        
-        String input_type = settings_template.get_sub_value(key, 0);
-
-        if(input_type == "label"){
-            response +=     "<hr/>";
-            response +=     "<h2>" + settings_template.get_sub_value(key, 1) + "</h2>";
+        response +=     "<label for=\"" + id + "\">" + name + "</label>";
+        //Based on the type of setting, create the input or select object in HTML
+        if(type == "num"){
+            response +=     "<input type=\"number\" ";
+        }else if(type == "pass"){
+            response +=     "<input type=\"password\" ";
+        }else if(type == "multi" || type == "bool"){
+            response +=     "<select ";
         }else{
-            response +=     "<label for=\"" + key + "\">" + settings_template.get_sub_value(key, 1) + "</label>";
-            if(input_type == "number"){
-                response +=     "<input type=\"number\" ";
-            }else if(input_type == "password"){
-                response +=     "<input type=\"password\" ";
-            }else if(input_type == "URL"){
-                response +=     "<input type=\"url\" ";
-            }else if(input_type == "number"){
-                response +=     "<input type=\"number\" ";
-            }else if(input_type == "multi" || input_type == "bool"){
-                response +=     "<select ";
-            }else{
-                response +=     "<input type=\"text\" ";
-            }
-
-            response +=     "class=\"form-control\" id=\"" + key + "\" name=\"" + key + "\" aria-describedby=\"" + key +"help\" ";
-
-            String settings_value = settings.get_value(key);
-
-            if(input_type == "multi" || input_type == "bool"){
-                response += ">";
-
-                if(input_type == "multi"){
-                    for(int i = 4; i < settings_template.get_number_values(key); i++){
-                        String this_value = settings_template.get_sub_value(key, i);
-                        response += "<option value=\"" + this_value + "\"";
-                        if(this_value == settings_value){
-                            response += "selected";
-                        }
-                        response +=">" + this_value + "</option>";
-                    }
-                }else{
-                    bool is_true = false;
-                    if(settings_value == "true") is_true = true;
-
-                    response += "<option value=\"true\"";
-                    if(is_true){
-                        response += "selected";
-                    }
-                    response +=">Yes</option>";
-
-                    response += "<option value=\"false\"";
-                    if(!is_true){
-                        response += "selected";
-                    }
-                    response +=">No</option>";
-                }
-                
-                response += "</select>";
-            }else{
-                response += "value=\"" + settings_value + "\">";
-            }
-            
-            response +=     "<small id=\"" + key + "help\" class=\"form-text text-muted\">" + settings_template.get_sub_value(key, 2) + "</small>";
-            response += "</div>";
-
+            response +=     "<input type=\"text\" ";
         }
 
-        
-    }
+        //Defined the IDs of the object
+        response +=     "class=\"form-control\" id=\"" + id + "\" name=\"" + id + "\" aria-describedby=\"" + id +"help\" ";
 
+        //For a multiple-choice setting...
+        if(type == "multi"){
+            response += ">";
+
+            bool finished = false;
+            uint8_t option_counter = 0;
+            //Go through each possible option
+            while(true){
+                //Create the key "optX" where X is the number from 0 going up...
+                String option_name = "opt" + String(option_counter);
+                
+                //If this option exists, create the HTML for it
+                if(setting.containsKey(option_name)){
+                    String this_option = setting[option_name];
+                    response += "<option value=\"" + this_option + "\"";
+                    //If the current option is the current value or default, pre-select it on the form 
+                    if(this_option == val) response += "selected";
+                    response +=">" + this_option + "</option>"; 
+                //If this option does not exist, exit the loop
+                }else{
+                    break;
+                }
+                
+                //Increase the counter to go to the next option
+                option_counter++;
+            }
+
+            response += "</select>";
+
+        //For a boolean setting...
+        }else if(type == "bool"){
+            response += ">";
+
+            //Create the Yes option
+            response += "<option value=true";
+            //If the current value is true, pre-select the Yes option
+            if(val){
+                response += "selected";
+            }
+            response +=">Yes</option>";
+
+            //Create the No option
+            response += "<option value=false";
+            //If the current value is false, pre-select the No option
+            if(!val){
+                response += "selected";
+            }
+            response +=">No</option>";
+            response += "</select>";
+            
+        //For all other types of settings, fill in the current value
+        }else{
+            response += "value=\"" + val + "\">";
+        }
+        
+        //Add help text if the description is defined
+        response +=     "<small id=\"" + id + "help\" class=\"form-text text-muted\">" + desc + "</small>";
+        response += "</div>";
+  
+    }
+    
     //Send the response to the browser
     server.send(200, "text/html", response);
 }
 
-/*  (private)handle_settings_pose: Receive new settings from the browser
+/*  (private)handle_settings_post: Receive new settings from the browser
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void handle_settings_post(){
-    //Confirm that the settings have been received
-    server.send(200);
-    
+    //Open the file for reading
+    File file = SPIFFS.open(settings_path, "r");
+    //Set aside enough memory for a JSON document
+    DynamicJsonDocument doc(file.size() * 2);
+
+    //Parse JSON from file 
+    deserializeJson(doc, file);
+    //Close the file
+    file.close();
+
     //For each server argument except the last one...
     for(int i = 0; i < server.args() - 1; i++){
-        //Store the settings
-        settings.put(server.argName(i), server.arg(i));
+        //Create a JSON object for the current setting
+        JsonObject setting = doc[i];
+        //Store the setting
+        setting["val"] = server.arg(i);
     }
+
+    //Open the file for writing
+    file = SPIFFS.open(settings_path, "w");
+    //Encode the JSON in the file
+    serializeJson(doc, file);
+    //Close the file
+    file.close();
+
+    //Confirm that the settings have been received
+    server.send(200);
 
     //Take the tag machine offline and restart
     _offline();
@@ -246,6 +303,8 @@ void handle_settings_post(){
 /*  Web_Interface Constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Web_Interface::Web_Interface(){
+    SPIFFS.begin();
+    SPIFFS.gc();
 }
 
 /*  set_callback: Set the callback function to take tag machine offline safely before restarting
@@ -259,37 +318,45 @@ void Web_Interface::set_callback(void_function_pointer offline){
     RETURNS true if there is no blank parameter that's required, false if there is a blank parameter that's required
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool check_settings_file(){
-    //Start off by assuming the file is valid
-    bool is_valid = true;
+    //Open the file
+    File file = SPIFFS.open(settings_path, "r");
+    //Set aside enough memory for a JSON document
+    DynamicJsonDocument doc(file.size() * 2);
+    //This will hold the number of settings
+    uint8_t number_settings = 0;
 
-    //The number of settings in the settings template
-    uint8_t template_entries = settings_template.get_number_entries();
-    if(template_entries == 0) return false;
+    //Parse JSON from file
+    DeserializationError error = deserializeJson(doc, file);
+    //If there is no error, save the number of settings
+    if(!error){
+        number_settings = doc.size();
+    } 
+    //Close the file
+    file.close();
+
+    //If there are no settings, return false
+    if(number_settings == 0) return false;
 
     //For each setting in the setting template...
-    for(int i = 0; i < template_entries; i++){
-        //Get the setting name from the template
-        String key = settings_template.get_key(i);
-        //If this particular setting is blank...
-        if(settings.get_value(key) == ""){
-            //Get the value of the default
-            String this_value = settings_template.get_sub_value(key, 3);
-            //If there is no default but the setting is required, it's not valid
-            if(this_value == "_REQ"){
-                is_valid = false;
-            //Otherwise, just store the default value
+    for(int i = 0; i < number_settings; i++){
+        //Create an object for this setting
+        JsonObject setting = doc[i];
+
+        //If this setting is required...
+        if(setting["req"] == true){
+            //If this setting has a value...
+            if(setting.containsKey("val")){
+                //If this setting has a blank value, return false
+                if(setting["val"] == "") return false;
+            //If this setting doesn't have a value, return false
             }else{
-                if(settings_template.get_sub_value(key, 0) == "multi"){
-                    settings.put(key, settings_template.get_sub_value(key, this_value.toInt() + 4));
-                }else{
-                    settings.put(key, this_value);
-                }
-                
+                return false;
             }
+
         }
     }
 
-    return is_valid;
+    return true;
 }
 
 /*  begin: Start the web interface
@@ -363,5 +430,33 @@ void Web_Interface::console_print(String output){
     RETURNS the specified setting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String Web_Interface::load_setting(String setting){
-    return settings.get_value(setting);
+    //Open the file for reading
+    File file = SPIFFS.open(settings_path, "r");
+    //Set aside enough memory for a JSON document
+    DynamicJsonDocument doc(file.size() * 2);
+    //This will store the number of settings
+    uint8_t number_settings = 0;
+
+    //Parse JSON from file
+    DeserializationError error = deserializeJson(doc, file);
+    //If there is no error, save the number of settings
+    if(!error){
+        number_settings = doc.size();
+    } 
+    //Close the file
+    file.close();
+
+    //For each setting in the setting template...
+    for(int i = 0; i < number_settings; i++){
+        //Create an object for this setting
+        JsonObject this_setting = doc[i];
+        //If the current setting is the one specified, return its value
+        if(this_setting["id"] == setting){
+            return this_setting["val"];
+        }
+    }
+
+    //If nothin has been returned so far, return an empty string
+    return "";     
+
 }
