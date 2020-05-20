@@ -72,9 +72,15 @@ bool handle_file_read(String path){
     //Get the content type 
     String content_type = get_content_type(path); 
 
+    bool cache = false;
+    if(path.endsWith(".js") || path.endsWith(".css") || path.endsWith(".ico")){
+        cache = true;
+    } 
+
     //If the compressed file exists, stream it to the client
     if(SPIFFS.exists(path + ".gz")){
-        File file = SPIFFS.open(path + ".gz", "r");                
+        File file = SPIFFS.open(path + ".gz", "r"); 
+        if(cache) server.sendHeader("Cache-Control", "max-age=2592000");          
         server.streamFile(file, content_type);
         file.close();                                    
         return true;
@@ -82,7 +88,8 @@ bool handle_file_read(String path){
 
     //If the file exists, stream it to the client
     if(SPIFFS.exists(path)){
-        File file = SPIFFS.open(path, "r");                
+        File file = SPIFFS.open(path, "r");
+        if(cache) server.sendHeader("Cache-Control", "max-age=2592000"); 
         server.streamFile(file, content_type);
         file.close();                                    
         return true;
@@ -139,6 +146,60 @@ void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
 
 }
 
+String text_input_HTML(String id, String val, String type){
+    String response = "<input type=\"";
+
+    if(type == "num"){
+        response += "number";
+    }else if(type == "pass"){
+        response += "password";
+    }else{
+        response += "text";
+    }
+    
+    response += "\" class=\"form-control\" id=\"" + id + "\" name=\"" + id + "\" aria-describedby=\"" + id +"help\" value=\"" + val + "\">";
+
+    return response;
+}
+
+String multi_input_html(String id, String val, String type, JsonArray opt){
+    String response = "<select class=\"form-control\" id=\"" + id + "\" name=\"" + id + "\" aria-describedby=\"" + id +"help\">";
+
+    if(type == "multi"){
+        
+        for(int i = 0; i < opt.size(); i++){
+            
+            String this_option = opt[i];
+            response += "<option value=\"" + this_option + "\"";
+            //If the current option is the current value or default, pre-select it on the form 
+            if(this_option == val) response += "selected";
+            response +=">" + this_option + "</option>"; 
+
+        }
+    }else{
+        //Create the Yes option
+        response += "<option value=true";
+        //If the current value is true, pre-select the Yes option
+        if(val){
+            response += "selected";
+        }
+        response +=">On</option>";
+
+        //Create the No option
+        response += "<option value=false";
+        //If the current value is false, pre-select the No option
+        if(!val){
+            response += "selected";
+        }
+        response +=">Off</option>";
+    
+    }
+
+    response += "</select>";
+
+    return response;
+}
+
 /*  (private)handle_settings_get: Send the settings to the browser as an HTML form
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void handle_settings_get(){
@@ -170,88 +231,24 @@ void handle_settings_get(){
     
     //For each setting...
     for(int i = 0; i < number_settings; i++){
-        //Create a JsonObject for this setting
-        JsonObject setting = doc[i];
-
         //Save the setting attributes
-        String id = setting["id"];
-        String type = setting["type"];
-        String name = setting["name"];
+        String id = doc[i]["id"];
+        String type = doc[i]["type"];
+        String name = doc[i]["name"];
         String desc = "";
-        if(setting.containsKey("desc")) desc = setting["desc"].as<String>();
+        if(doc[i].containsKey("desc")) desc = doc[i]["desc"].as<String>();
         String val = "";
-        if(setting.containsKey("val")) val = setting["val"].as<String>();
+        if(doc[i].containsKey("val")) val = doc[i]["val"].as<String>();
 
         //Form the HTML response
         response += "<div class=\"form-group\">";
-        response +=     "<label for=\"" + id + "\">" + name + "</label>";
+        response += "<label for=\"" + id + "\">" + name + "</label>";
         //Based on the type of setting, create the input or select object in HTML
-        if(type == "num"){
-            response +=     "<input type=\"number\" ";
-        }else if(type == "pass"){
-            response +=     "<input type=\"password\" ";
-        }else if(type == "multi" || type == "bool"){
-            response +=     "<select ";
+
+        if(type == "multi" || type == "bool"){
+            response += multi_input_html(id, val, type, doc[i]["opt"]);
         }else{
-            response +=     "<input type=\"text\" ";
-        }
-
-        //Defined the IDs of the object
-        response +=     "class=\"form-control\" id=\"" + id + "\" name=\"" + id + "\" aria-describedby=\"" + id +"help\" ";
-
-        //For a multiple-choice setting...
-        if(type == "multi"){
-            response += ">";
-
-            bool finished = false;
-            uint8_t option_counter = 0;
-            //Go through each possible option
-            while(true){
-                //Create the key "optX" where X is the number from 0 going up...
-                String option_name = "opt" + String(option_counter);
-                
-                //If this option exists, create the HTML for it
-                if(setting.containsKey(option_name)){
-                    String this_option = setting[option_name];
-                    response += "<option value=\"" + this_option + "\"";
-                    //If the current option is the current value or default, pre-select it on the form 
-                    if(this_option == val) response += "selected";
-                    response +=">" + this_option + "</option>"; 
-                //If this option does not exist, exit the loop
-                }else{
-                    break;
-                }
-                
-                //Increase the counter to go to the next option
-                option_counter++;
-            }
-
-            response += "</select>";
-
-        //For a boolean setting...
-        }else if(type == "bool"){
-            response += ">";
-
-            //Create the Yes option
-            response += "<option value=true";
-            //If the current value is true, pre-select the Yes option
-            if(val){
-                response += "selected";
-            }
-            response +=">Yes</option>";
-
-            //Create the No option
-            response += "<option value=false";
-            //If the current value is false, pre-select the No option
-            if(!val){
-                response += "selected";
-            }
-            response +=">No</option>";
-            response += "</select>";
-            
-        //For all other types of settings, fill in the current value
-        }else{
-            response += "value=\"" + val + "\">";
+            response += text_input_HTML(id, val, type);
         }
         
         //Add help text if the description is defined
@@ -279,10 +276,8 @@ void handle_settings_post(){
 
     //For each server argument except the last one...
     for(int i = 0; i < server.args() - 1; i++){
-        //Create a JSON object for the current setting
-        JsonObject setting = doc[i];
         //Store the setting
-        setting["val"] = server.arg(i);
+        doc[i]["val"] = server.arg(i);
     }
 
     //Open the file for writing
@@ -339,15 +334,12 @@ bool check_settings_file(){
 
     //For each setting in the setting template...
     for(int i = 0; i < number_settings; i++){
-        //Create an object for this setting
-        JsonObject setting = doc[i];
-
         //If this setting is required...
-        if(setting["req"] == true){
+        if(doc[i]["req"] == true){
             //If this setting has a value...
-            if(setting.containsKey("val")){
+            if(doc[i].containsKey("val")){
                 //If this setting has a blank value, return false
-                if(setting["val"] == "") return false;
+                if(doc[i]["val"] == "") return false;
             //If this setting doesn't have a value, return false
             }else{
                 return false;
@@ -448,11 +440,9 @@ String Web_Interface::load_setting(String setting){
 
     //For each setting in the setting template...
     for(int i = 0; i < number_settings; i++){
-        //Create an object for this setting
-        JsonObject this_setting = doc[i];
         //If the current setting is the one specified, return its value
-        if(this_setting["id"] == setting){
-            return this_setting["val"];
+        if(doc[i]["id"] == setting){
+            return doc[i]["val"];
         }
     }
 

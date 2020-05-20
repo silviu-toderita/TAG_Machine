@@ -8,8 +8,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 #include "Arduino.h" //Arduino Library
-#include "EEPROM.h" //EEPROM Library
-#include "Persistent_Storage.h"
+#include "Persistent_Storage.h" //Silviu's persistent storage library
 
 //Network Libraries
 #include "WiFi_Manager.h" //Silviu's WiFi Manager Library
@@ -413,16 +412,14 @@ void bootloader(bool web_interface_on){
     //Create a hotspot
     WiFi_manager.create_hotspot(device_name, device_password);
 
-    uint32_t start = millis();
     bool LED_on = false;
     //Loop forever
     while(true){
         //Flash the LED 4 times a second
-        uint32_t time_elapsed = millis() - start;
-        if(LED_on && time_elapsed % 250 < 125){
+        if(LED_on && millis() % 250 < 125){
             digitalWrite(LED_pin, HIGH);
             LED_on = false;
-        }else if(!LED_on && time_elapsed % 250 >= 125){
+        }else if(!LED_on && millis() % 250 >= 125){
             digitalWrite(LED_pin, LOW);
             LED_on = true;
         }
@@ -508,8 +505,8 @@ void loop() {
 
         case WM_CONNECTION_SUCCESS: //Connection to a Wi-Fi Network succeeded
         case WM_CONNECTED://Connected to a Wi-Fi Network
-            web_interface.handle(); //Update the web interface
             MDNS.update(); //Run mDNS service
+            web_interface.handle(); //Update the web interface
             ArduinoOTA.handle(); //Run OTA updater service
             WTA_clock.handle(); //Update the clock
 
@@ -527,8 +524,8 @@ void loop() {
 
         //Currently running a hotspot
         case WM_HOTSPOT:
-            web_interface.handle(); //Update the web interface
             MDNS.update(); //Run mDNS service
+            web_interface.handle(); //Update the web interface
             ArduinoOTA.handle(); //Run OTA updater service
             
             //If the button is pressed, connect to the wi-fi
