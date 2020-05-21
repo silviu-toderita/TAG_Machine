@@ -139,9 +139,9 @@ void process_message(String time, String from_number, String message, String med
     if(name == ""){
         request_name = true;
     //If a name was requested already and the reply message isn't blank...
-    }else if(name.substring(0,4) == "_REQ" && message != ""){
+    }else if(name.substring(0,4) == "_REQ"){
         //If the request is less than 24 hours old...
-        if(time.toInt() <= name.substring(4).toInt() + 86400){
+        if(time.toInt() <= name.substring(4).toInt() + 86400 && message != ""){
             //Store the name in the phone book
             phone_book.set(from_number, message);
             //Reply with a success message
@@ -362,13 +362,14 @@ void create_hotspot(){
 /*  load_settings: Load the settings from the settings file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void load_settings(){
+    //Load variables
     phone_number = web_interface.load_setting("phone_number");
-    console(web_interface.load_setting("phone_number"));
     owner_name = web_interface.load_setting("owner_name");
     MQTT_address = web_interface.load_setting("MQTT_address");
     button_pin = web_interface.load_setting("button_pin").toInt();
     LED_pin = web_interface.load_setting("LED_pin").toInt();
 
+    //Set up printer, WiFi Manager, and Twilio
     printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt());
     WiFi_manager.add_network(web_interface.load_setting("WiFi_SSID"),web_interface.load_setting("WiFi_password"));
     twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"), web_interface.load_setting("Twilio_fingerprint"));
@@ -383,6 +384,8 @@ void offline(){
     printer.offline();
 }
 
+/*  init_basics: Initialize basic functions of the TAG Machine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void init_basics(){
     //Initialize the button and LED pins
     pinMode(button_pin, INPUT_PULLUP);
@@ -408,6 +411,7 @@ void init_basics(){
         web_interface_on: Specifies if the web interface should be on to see the console and update settings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void bootloader(bool web_interface_on){
+    //Initialize basic functions
     init_basics();
     //Create a hotspot
     WiFi_manager.create_hotspot(device_name, device_password);
@@ -443,6 +447,7 @@ void bootloader(bool web_interface_on){
     ####  SETUP  ####
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void setup() {
+    //Start the button to listen for bootloader mode
     pinMode(button_pin, INPUT_PULLUP);
     //If the button is held down, start the bootloader without the web interface running
     if(!digitalRead(button_pin)){
@@ -479,6 +484,7 @@ void setup() {
     printer.print_bitmap_file(file, 2, "TAG MACHINE");
     file.close();
 
+    //If the MQTT address starts with http://, remove it and continue
     if(MQTT_address.substring(0, 7) == "http://") MQTT_address = MQTT_address.substring(7);
     MQTT_client.setServer(MQTT_address.c_str(), 1883);
     //Set callback for incoming message from MQTT
@@ -513,7 +519,6 @@ void loop() {
             //If the MQTT client is connected, update it.
             if(MQTT_client.connected()){
                 MQTT_client.loop();
-            
             //If the MQTT client is not connected...
             }else{
                 //Attempt to connect to MQTT

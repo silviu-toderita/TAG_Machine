@@ -8,15 +8,24 @@
     files for server in /www/ folder in SPIFFS. 
 
     To use the settings function, place a settings.txt file in the root 
-    of the SPIFFS. Settings must be in the format of a JSON array, with each object
-    in the array having these possible attributes:
-    "id" (required): a string with no spaces to name each setting
-    "type" (required): text, pass, bool, or multi
-    "name" (required): Human readable name
-    "req" (required): True or False if this setting is required to be filled in.
-    "val": Default value
-    "optx": For multi type, each option must be listed as optx where x is a number
-        from 0 to inifinity in sequence.
+    of the SPIFFS. Settings must be in the following JSON format:
+    [
+        {"category":"1st Settings Category",
+        "settings":[
+            {"id":"",
+            "type":"",
+            "name":"",
+            "desc":"",
+            "req":true,
+            "val":""}
+            ]
+        },
+        {"category":"2nd Settings Category",
+        "settings":[
+
+            ]
+        }
+    ]
 
     begin() will return false if there are any required settings that are missing.
     load_setting() allows you to load a setting based on its name. 
@@ -95,7 +104,7 @@ bool handle_file_read(String path){
         return true;
     }
 
-    //If the file exists in the root folder instead of the /www/ folder, stream it to the client
+    //If the file exists in the root folder instead of the /www/ folder, stream it to the client (this is for debugging non-server files)
     if(SPIFFS.exists(path.substring(4))){
         File file = SPIFFS.open(path.substring(4), "r");                
         server.streamFile(file, content_type);
@@ -146,9 +155,17 @@ void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
 
 }
 
-String text_input_HTML(String id, String val, String type){
+/*  (private)text_input_HTML: Create the html for a text form input
+        id: setting id
+        val: current or default setting value
+        type: Setting type, valid inputs are "num", "pass", or "text". Anything else defaults to "text"
+    RETURNS complete HTML
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+String text_input_HTML(String id, String val, String type, bool req){
+    //Create the string that will hold the response
     String response = "<input type=\"";
 
+    //Specify the type
     if(type == "num"){
         response += "number";
     }else if(type == "pass"){
@@ -157,27 +174,46 @@ String text_input_HTML(String id, String val, String type){
         response += "text";
     }
     
-    response += "\" class=\"form-control\" id=\"" + id + "\" name=\"" + id + "\" aria-describedby=\"" + id +"help\" value=\"" + val + "\">";
+    //Create the input field
+    response += "\" class=\"form-control\" id=\"" + id + "\" name=\"" + id + "\" aria-describedby=\"" + id +"help\" value=\"" + val + "\"";
+    //If this setting is required, make it a required field 
+    if(req){
+        response += "required";
+    }
+
+    response += ">";
 
     return response;
 }
 
+/*  (private)multi_input_HTML: Create the html for a multiple choice input
+        id: setting id
+        val: current or default setting value
+        type: Setting type, valid inputs are "multi" or "bool"
+        opt: a JsonArray of possible options, only required for "multi" type
+    RETURNS complete HTML
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String multi_input_html(String id, String val, String type, JsonArray opt){
+
+    //Create the string that will hold the response
     String response = "<select class=\"form-control\" id=\"" + id + "\" name=\"" + id + "\" aria-describedby=\"" + id +"help\">";
 
+    //If this is a multiple-choice setting...
     if(type == "multi"){
         
+        //For each option...
         for(int i = 0; i < opt.size(); i++){
             
+            //This string holds the option name
             String this_option = opt[i];
             response += "<option value=\"" + this_option + "\"";
             //If the current option is the current value or default, pre-select it on the form 
             if(this_option == val) response += "selected";
             response +=">" + this_option + "</option>"; 
-
         }
+    //Otherwise, this is a boolean setting...
     }else{
-        //Create the Yes option
+        //Create the On option
         response += "<option value=true";
         //If the current value is true, pre-select the Yes option
         if(val){
@@ -185,7 +221,7 @@ String multi_input_html(String id, String val, String type, JsonArray opt){
         }
         response +=">On</option>";
 
-        //Create the No option
+        //Create the Off option
         response += "<option value=false";
         //If the current value is false, pre-select the No option
         if(!val){
@@ -207,58 +243,117 @@ void handle_settings_get(){
     File file = SPIFFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
-    //Number of settings present in the file
-    uint8_t number_settings = 0;
 
     //Parse JSON from file
     DeserializationError error = deserializeJson(doc, file);
-    if(!error){
-        //If there is no issue with the parsing, save the number of settings
-        number_settings = doc.size();
-    } 
 
     //Close the file
     file.close();
 
-    //This will hold the HTML response to the browser
+    //If there is an error, send the response to the browser and exit the function
+    if(error){
+        server.send(200, "text/html", "<h3>Invalid settings file or no settings defined!</h3>");
+        return;
+    } 
+
+    //This will hold the status of whether or not there will be a tabbed interface
+    bool tabbed_interface = false;
+    //If there are no settings categories, send the response to the browser and exit the function
+    if(doc.size() == 0){
+        server.send(200, "text/html", "<h3>No settings defined!</h3>");
+        return;
+    //If there is more than 1 settings category, there will need to be a tabbed interface
+    }else if(doc.size() > 1){
+        tabbed_interface = true;
+    }
+
+    //These will hold the HTML response to the browser
+    String response_header = "";
     String response;
 
-    //Respond with no settings defined if there are none
-    if(number_settings == 0){
-        response = "<h3>No Settings Defined!</h3>";
-        
+    //If there is a tabbed interface, create the nav area
+    if(tabbed_interface){
+        response_header = "<ul class=\"nav nav-tabs\" id=\"settings_nav\" role=\"tablist\">";
+        response = "<div class=\"tab-content\" id=\"settings_nav_content\">";
     }
-    
-    //For each setting...
-    for(int i = 0; i < number_settings; i++){
-        //Save the setting attributes
-        String id = doc[i]["id"];
-        String type = doc[i]["type"];
-        String name = doc[i]["name"];
-        String desc = "";
-        if(doc[i].containsKey("desc")) desc = doc[i]["desc"].as<String>();
-        String val = "";
-        if(doc[i].containsKey("val")) val = doc[i]["val"].as<String>();
 
-        //Form the HTML response
-        response += "<div class=\"form-group\">";
-        response += "<label for=\"" + id + "\">" + name + "</label>";
-        //Based on the type of setting, create the input or select object in HTML
+    //For each setting category...
+    for(int x = 0; x < doc.size(); x++){
+        
+        //If there is a tabbed interface, create this tab
+        if(tabbed_interface){
+            //Get the category name
+            String category_name = doc[x]["category"];
 
-        if(type == "multi" || type == "bool"){
-            response += multi_input_html(id, val, type, doc[i]["opt"]);
-        }else{
-            response += text_input_HTML(id, val, type);
+            //Add the HTML for the list
+            response_header += "<li class=\"nav-item\">";
+
+            //Add the HTML for the link
+            response_header += "<a class=\"nav-link"; 
+            //If this is the first category, make it active
+            if(x == 0) response_header += " active"; 
+            response_header += "\" id=\"category" + String(x) + "-tab\" data-toggle=\"tab\" href=\"#category" + String(x) + "\" role\"tab\" aria-controls=\"category" + String(x) + "\" aria-selected=\"";
+            //If this is the first category, make it active
+            if(x == 0){
+                response_header += "true";
+            }else{
+                response_header += "false";
+            }
+            response_header += "\">" + category_name + "</a>";
+            response_header += "</li>";
+
+            //Add the HTML for the content of the tab
+            response += "<div class=\"tab-pane fade";
+            //If this is the first category, make it active
+            if(x == 0) response += " show active";
+            response += "\" id=\"category" + String(x) + "\" role=\"tabpanel\" aria-labelledby=\"category" + String(x) + "-tab\">";
         }
-        
-        //Add help text if the description is defined
-        response +=     "<small id=\"" + id + "help\" class=\"form-text text-muted\">" + desc + "</small>";
-        response += "</div>";
-  
+
+        //The array of settings for this category
+        JsonArray settings = doc[x]["settings"];
+
+        //For each setting...
+        for(int i = 0; i < settings.size(); i++){
+            //Save the setting attributes
+            String id = settings[i]["id"];
+            String type = settings[i]["type"];
+            String name = settings[i]["name"];
+            String desc = "";
+            if(settings[i].containsKey("desc")) desc = settings[i]["desc"].as<String>();
+            String val = "";
+            if(settings[i].containsKey("val")) val = settings[i]["val"].as<String>();
+            bool req = settings[i]["req"];
+
+            //Form the HTML response
+            response += "<div class=\"form-group\">";
+            response += "<label for=\"" + id + "\">" + name + "</label>";
+
+            //Based on the type of setting, get the HTML
+            if(type == "multi" || type == "bool"){
+                response += multi_input_html(id, val, type, settings[i]["opt"]);
+            }else{
+                response += text_input_HTML(id, val, type, req);
+            }
+            
+            //Add help text if the description is defined
+            response +=     "<small id=\"" + id + "help\" class=\"form-text text-muted\">" + desc + "</small>";
+            response += "</div>";
+
+        }
+
+        //If there is a tabbed interface, close out this tab
+        if(tabbed_interface) response += "</div>";
+
     }
-    
+
+    //If there is a tabbed interface, close out the tab list
+    if(tabbed_interface){
+        response_header += "</ul><br>";
+        response += "</div>";
+    }
+
     //Send the response to the browser
-    server.send(200, "text/html", response);
+    server.send(200, "text/html", response_header + response);
 }
 
 /*  (private)handle_settings_post: Receive new settings from the browser
@@ -274,10 +369,22 @@ void handle_settings_post(){
     //Close the file
     file.close();
 
-    //For each server argument except the last one...
-    for(int i = 0; i < server.args() - 1; i++){
-        //Store the setting
-        doc[i]["val"] = server.arg(i);
+    //Confirm that the settings have been received
+    server.send(200);
+
+    uint8_t current_server_arg = 0;
+
+    //For each setting category...
+    for(int y = 0; y < doc.size(); y++){
+        //Array of settings in this category
+        JsonArray settings = doc[y]["settings"];
+        //For each setting...
+        for(int x = 0; x < settings.size(); x++){
+            //Copy the server argument to the current value and increment the server argument
+            settings[x]["val"] = server.arg(current_server_arg);
+            current_server_arg++;
+
+        }
     }
 
     //Open the file for writing
@@ -286,9 +393,6 @@ void handle_settings_post(){
     serializeJson(doc, file);
     //Close the file
     file.close();
-
-    //Confirm that the settings have been received
-    server.send(200);
 
     //Take the tag machine offline and restart
     _offline();
@@ -317,34 +421,36 @@ bool check_settings_file(){
     File file = SPIFFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
-    //This will hold the number of settings
-    uint8_t number_settings = 0;
 
     //Parse JSON from file
     DeserializationError error = deserializeJson(doc, file);
-    //If there is no error, save the number of settings
-    if(!error){
-        number_settings = doc.size();
-    } 
+
     //Close the file
     file.close();
 
-    //If there are no settings, return false
-    if(number_settings == 0) return false;
+    //If there is no error, save the number of settings
+    if(error){
+        return false;
+    } 
+    
+    //For each setting category...
+    for(int x = 0; x < doc.size(); x++){
 
-    //For each setting in the setting template...
-    for(int i = 0; i < number_settings; i++){
-        //If this setting is required...
-        if(doc[i]["req"] == true){
-            //If this setting has a value...
-            if(doc[i].containsKey("val")){
-                //If this setting has a blank value, return false
-                if(doc[i]["val"] == "") return false;
-            //If this setting doesn't have a value, return false
-            }else{
-                return false;
+        //Array of settings in this category
+        JsonArray settings = doc[x]["settings"];
+        //For each setting...
+        for(int i = 0; i < settings.size(); i++){
+            //If this setting is required...
+            if(settings[i]["req"] == true){
+                //If this setting has a value...
+                if(settings[i].containsKey("val")){
+                    //If this setting has a blank value, return false
+                    if(settings[i]["val"] == "") return false;
+                //If this setting doesn't have a value, return false
+                }else{
+                    return false;
+                }
             }
-
         }
     }
 
@@ -426,23 +532,27 @@ String Web_Interface::load_setting(String setting){
     File file = SPIFFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
-    //This will store the number of settings
-    uint8_t number_settings = 0;
 
     //Parse JSON from file
     DeserializationError error = deserializeJson(doc, file);
-    //If there is no error, save the number of settings
-    if(!error){
-        number_settings = doc.size();
-    } 
     //Close the file
     file.close();
+    //If there is an error, return a blank response
+    if(error){
+        return "";
+    } 
 
-    //For each setting in the setting template...
-    for(int i = 0; i < number_settings; i++){
-        //If the current setting is the one specified, return its value
-        if(doc[i]["id"] == setting){
-            return doc[i]["val"];
+    //For each setting category...
+    for(int x = 0; x < doc.size(); x++){
+
+        //Array of settings in this category
+        JsonArray settings = doc[x]["settings"];
+        //For each setting...
+        for(int i = 0; i < settings.size(); i++){
+            //If the current setting is the one specified, return its value
+            if(settings[i]["id"] == setting){
+                return settings[i]["val"];
+            }
         }
     }
 
