@@ -359,6 +359,9 @@ void handle_settings_get(){
 /*  (private)handle_settings_post: Receive new settings from the browser
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void handle_settings_post(){
+    //Confirm that the settings have been received
+    server.send(200);
+
     //Open the file for reading
     File file = SPIFFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
@@ -368,9 +371,6 @@ void handle_settings_post(){
     deserializeJson(doc, file);
     //Close the file
     file.close();
-
-    //Confirm that the settings have been received
-    server.send(200);
 
     uint8_t current_server_arg = 0;
 
