@@ -8,27 +8,38 @@
     files for server in /www/ folder in SPIFFS. 
 
     To use the settings function, place a settings.txt file in the root 
-    of the SPIFFS. Settings must be in the following JSON format:
-    [
-        {"category":"1st Settings Category",
-        "settings":[
-            {"id":"",
-            "type":"",
-            "name":"",
-            "desc":"",
-            "req":true,
-            "val":""}
-            ]
-        },
-        {"category":"2nd Settings Category",
-        "settings":[
-
-            ]
-        }
-    ]
+    of the SPIFFS. Settings must be in the following JSON format ("advanced" is
+    an optional category, while "basic" and "wifi" are required and can have any
+    number of settings):
+    {"basic":[
+        {"id":"",
+        "type":"",
+        "name":"",
+        "desc":"",
+        "req":true,
+        "val":""}
+        ],
+    "advanced":[
+        {"id":"",
+        "type":"",
+        "name":"",
+        "desc":"",
+        "req":false,
+        "val":""}
+        ],
+    "wifi":[
+        {"id":"",
+        "type":"",
+        "name":"",
+        "desc":"",
+        "req":true,
+        "val":""}
+        ]
+    }
+    
 
     begin() will return false if there are any required settings that are missing.
-    load_setting() allows you to load a setting based on its name. 
+    load_setting() allows you to load a setting based on its id. 
 
     Created by Silviu Toderita in 2020.
     silviu.toderita@gmail.com
@@ -45,6 +56,15 @@ static void_function_pointer _offline; //Callback function when connected
 int8_t websockets_client = -1; //Current websockets client number connected to (-1 is none)
 
 const String settings_path = "/settings.txt"; //Path to settings file
+
+File upload_file; //Holds file currently uploading
+
+//settings
+const bool settings_page = true;
+const bool console_page = true;
+const uint8_t number_custom_pages = 1;
+const String custom_page_path[number_custom_pages] = "/contacts/";
+const String custom_page_name[number_custom_pages] = "Contacts";
 
 /*  (private) get_content_type: Returns the HTTP content type based on the extension
         filename: 
@@ -236,6 +256,46 @@ String multi_input_html(String id, String val, String type, JsonArray opt){
     return response;
 }
 
+/*  (private)multi_input_HTML: Create the html for all inputs in a category
+        settings: JsonArray of settings in this category
+    RETURNS complete HTML
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+String input_html(JsonArray settings){
+    String response = "";
+    //For each setting...
+    for(int i = 0; i < settings.size(); i++){
+        //Save the setting attributes
+        String id = settings[i]["id"];
+        String type = settings[i]["type"];
+        String name = settings[i]["name"];
+        String desc = "";
+        if(settings[i].containsKey("desc")) desc = settings[i]["desc"].as<String>();
+        String val = "";
+        if(settings[i].containsKey("val")) val = settings[i]["val"].as<String>();
+        bool req = settings[i]["req"];
+
+        //Form the HTML response
+        response += "<div class=\"form-group\">";
+        response += "<label for=\"" + id + "\">" + name + "</label>";
+
+        //Based on the type of setting, get the HTML
+        if(type == "multi" || type == "bool"){
+            response += multi_input_html(id, val, type, settings[i]["opt"]);
+        }else{
+            response += text_input_HTML(id, val, type, req);
+        }
+        
+        //Add help text if the description is defined
+        response +=     "<small id=\"" + id + "help\" class=\"form-text text-muted\">" + desc + "</small>";
+        response += "</div>";
+
+    }
+
+    
+
+    return response;
+}
+
 /*  (private)handle_settings_get: Send the settings to the browser as an HTML form
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void handle_settings_get(){
@@ -256,104 +316,53 @@ void handle_settings_get(){
         return;
     } 
 
-    //This will hold the status of whether or not there will be a tabbed interface
-    bool tabbed_interface = false;
-    //If there are no settings categories, send the response to the browser and exit the function
-    if(doc.size() == 0){
-        server.send(200, "text/html", "<h3>No settings defined!</h3>");
-        return;
-    //If there is more than 1 settings category, there will need to be a tabbed interface
-    }else if(doc.size() > 1){
-        tabbed_interface = true;
-    }
+    //Store whether the settings category exists or not
+    bool advanced = doc.containsKey("advanced");
 
-    //These will hold the HTML response to the browser
-    String response_header = "";
+    //This will hold the HTML response to the browser
     String response;
-
-    //If there is a tabbed interface, create the nav area
-    if(tabbed_interface){
-        response_header = "<ul class=\"nav nav-tabs\" id=\"settings_nav\" role=\"tablist\">";
-        response = "<div class=\"tab-content\" id=\"settings_nav_content\">";
+    //Create the tabs
+    response = "<ul class=\"nav nav-tabs\" id=\"settings_nav\" role=\"tablist\">";
+    //Tab for general settings
+    response +=     "<li class=\"nav-item\">";
+    response +=         "<a class=\"nav-link active\" id=\"category-general-tab\" data-toggle=\"tab\" href=\"#category-general\" role\"tab\" aria-controls=\"category-general\" aria-selected=\"true;\">General</a>";
+    response +=     "</li>";
+    //Tab for advanced settings
+    if(advanced){
+        response += "<li class=\"nav-item\">";
+        response +=     "<a class=\"nav-link\" id=\"category-advanced-tab\" data-toggle=\"tab\" href=\"#category-advanced\" role\"tab\" aria-controls=\"category-advanced\" aria-selected=\"false;\">Advanced</a>";
+        response += "</li>";
     }
+    //Tab for WiFi settings
+    response +=     "<li class=\"nav-item\">";
+    response +=         "<a class=\"nav-link\" id=\"category-wifi-tab\" data-toggle=\"tab\" href=\"#category-wifi\" role\"tab\" aria-controls=\"category-wifi\" aria-selected=\"false;\">Wi-Fi</a>";
+    response +=     "</li>";
+    //End the tabs
+    response += "</ul>";
+    response += "<br>";
 
-    //For each setting category...
-    for(int x = 0; x < doc.size(); x++){
-        
-        //If there is a tabbed interface, create this tab
-        if(tabbed_interface){
-            //Get the category name
-            String category_name = doc[x]["category"];
+    //Tab contents for general settings
+    response += "<div class=\"tab-content\" id=\"settings_nav_content\">";
+    response +=     "<div class=\"tab-pane fade show active\" id=\"category-general\" role=\"tabpanel\" aria-labelledby=\"category-general-tab\">";
+    response +=         input_html(doc["general"]);
+    response +=     "</div>";
 
-            //Add the HTML for the list
-            response_header += "<li class=\"nav-item\">";
-
-            //Add the HTML for the link
-            response_header += "<a class=\"nav-link"; 
-            //If this is the first category, make it active
-            if(x == 0) response_header += " active"; 
-            response_header += "\" id=\"category" + String(x) + "-tab\" data-toggle=\"tab\" href=\"#category" + String(x) + "\" role\"tab\" aria-controls=\"category" + String(x) + "\" aria-selected=\"";
-            //If this is the first category, make it active
-            if(x == 0){
-                response_header += "true";
-            }else{
-                response_header += "false";
-            }
-            response_header += "\">" + category_name + "</a>";
-            response_header += "</li>";
-
-            //Add the HTML for the content of the tab
-            response += "<div class=\"tab-pane fade";
-            //If this is the first category, make it active
-            if(x == 0) response += " show active";
-            response += "\" id=\"category" + String(x) + "\" role=\"tabpanel\" aria-labelledby=\"category" + String(x) + "-tab\">";
-        }
-
-        //The array of settings for this category
-        JsonArray settings = doc[x]["settings"];
-
-        //For each setting...
-        for(int i = 0; i < settings.size(); i++){
-            //Save the setting attributes
-            String id = settings[i]["id"];
-            String type = settings[i]["type"];
-            String name = settings[i]["name"];
-            String desc = "";
-            if(settings[i].containsKey("desc")) desc = settings[i]["desc"].as<String>();
-            String val = "";
-            if(settings[i].containsKey("val")) val = settings[i]["val"].as<String>();
-            bool req = settings[i]["req"];
-
-            //Form the HTML response
-            response += "<div class=\"form-group\">";
-            response += "<label for=\"" + id + "\">" + name + "</label>";
-
-            //Based on the type of setting, get the HTML
-            if(type == "multi" || type == "bool"){
-                response += multi_input_html(id, val, type, settings[i]["opt"]);
-            }else{
-                response += text_input_HTML(id, val, type, req);
-            }
-            
-            //Add help text if the description is defined
-            response +=     "<small id=\"" + id + "help\" class=\"form-text text-muted\">" + desc + "</small>";
-            response += "</div>";
-
-        }
-
-        //If there is a tabbed interface, close out this tab
-        if(tabbed_interface) response += "</div>";
-
-    }
-
-    //If there is a tabbed interface, close out the tab list
-    if(tabbed_interface){
-        response_header += "</ul><br>";
+    //Tab contents for advanced settings
+    if(advanced){
+        response += "<div class=\"tab-pane fade\" id=\"category-advanced\" role=\"tabpanel\" aria-labelledby=\"category-advanced-tab\">";
+        response +=     input_html(doc["advanced"]);
         response += "</div>";
     }
+    //Tab contents for wifi settings
+    response +=     "<div class=\"tab-pane fade\" id=\"category-wifi\" role=\"tabpanel\" aria-labelledby=\"category-wifi-tab\">";
+    response +=         input_html(doc["wifi"]);
+    response +=     "</div>";
+
+    //End the settings form
+    response += "</div>";
 
     //Send the response to the browser
-    server.send(200, "text/html", response_header + response);
+    server.send(200, "text/html", response);
 }
 
 /*  (private)handle_settings_post: Receive new settings from the browser
@@ -372,20 +381,35 @@ void handle_settings_post(){
     //Close the file
     file.close();
 
+    //Store whether the settings category exists or not
+    bool advanced = doc.containsKey("advanced");
+
+    //The current server argument being processed
     uint8_t current_server_arg = 0;
 
-    //For each setting category...
-    for(int y = 0; y < doc.size(); y++){
-        //Array of settings in this category
-        JsonArray settings = doc[y]["settings"];
+    //This array holds the settings for the current category
+    JsonArray settings;
+
+    //Cycle through each setting category
+    for(int i = 0; i < doc.size(); i++){
+        //Load the correct category depending on the current loop
+        if(i == 0){
+            settings = doc["general"];
+        }else if(advanced && i == 1){
+            settings = doc["advanced"];
+        }else{
+            settings = doc["wifi"];
+        }
+
         //For each setting...
         for(int x = 0; x < settings.size(); x++){
             //Copy the server argument to the current value and increment the server argument
             settings[x]["val"] = server.arg(current_server_arg);
             current_server_arg++;
-
         }
+
     }
+
 
     //Open the file for writing
     file = SPIFFS.open(settings_path, "w");
@@ -397,6 +421,43 @@ void handle_settings_post(){
     //Take the tag machine offline and restart
     _offline();
     ESP.restart();
+}
+
+/*  (private)handle_nav: Send the navigation bar to the browser as a dynamically-generated navbar
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void handle_nav(){
+    String response;
+    response = "<nav class=\"navbar navbar-expand-md navbar-dark bg-dark mb-4\">";
+    response +=     "<a class=\"navbar-brand\" href=\"/index.html\">TAG Machine</a>";
+    response +=     "<button class=\"navbar-toggler\" type=\"button\" data-toggle=\"collapse\" data-target=\"#navbarCollapse\" aria-controls=\"navbarCollapse\" aria-expanded=\"false\" aria-label=\"Toggle navigation\">";
+    response +=         "<span class=\"navbar-toggler-icon\"></span>";
+    response +=     "</button>";
+    response +=     "<div class=\"collapse navbar-collapse\" id=\"navbarCollapse\">";
+    response +=         "<ul class=\"navbar-nav\">";
+
+    for(int i = 0; i < number_custom_pages; i++){
+        response +=         "<li class=\"nav-item\">";
+        response +=             "<a class=\"nav-link\" href=\"" + custom_page_path[i] + "\">" + custom_page_name[i] + "</a>";
+        response +=         "</li>";
+    }
+
+    if(settings_page){
+        response +=         "<li class=\"nav-item\">";
+        response +=             "<a class=\"nav-link\" href=\"/settings/\">Settings</a>";
+        response +=         "</li>";
+    }
+    if(console_page){
+        response +=         "<li class=\"nav-item\">";
+        response +=             "<a class=\"nav-link\" href=\"/console/\">Console</a>";
+        response +=         "</li>";
+    }
+
+    response +=         "</ul>";
+    response +=     "</div>";
+    response += "</nav>";
+
+    server.sendHeader("Cache-Control", "max-age=2592000");    
+    server.send(200, "text/html", response);
 }
 
 /*  Web_Interface Constructor (with defaults)
@@ -428,16 +489,27 @@ bool check_settings_file(){
     //Close the file
     file.close();
 
-    //If there is no error, save the number of settings
+    //If there is an error, return false
     if(error){
         return false;
     } 
     
-    //For each setting category...
-    for(int x = 0; x < doc.size(); x++){
+    //Store whether the settings category exists or not
+    bool advanced = doc.containsKey("advanced");
 
-        //Array of settings in this category
-        JsonArray settings = doc[x]["settings"];
+    //This array holds the settings for the current category
+    JsonArray settings;
+    //Cycle through each setting category
+    for(int i = 0; i < doc.size(); i++){
+        //Load the correct category based on the current loop
+        if(i == 0){
+            settings = doc["general"];
+        }else if(advanced && i == 1){
+            settings = doc["advanced"];
+        }else{
+            settings = doc["wifi"];
+        }
+
         //For each setting...
         for(int i = 0; i < settings.size(); i++){
             //If this setting is required...
@@ -457,6 +529,38 @@ bool check_settings_file(){
     return true;
 }
 
+/*  (private)handle_file_upload: Processes file upload and saves it to SPIFFS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+void handle_file_upload(){
+    //Holds current upload
+    HTTPUpload& upload = server.upload();
+    //If the upload is starting...
+    if(upload.status == UPLOAD_FILE_START){
+        //Get the filename
+        String filename = upload.filename;
+        //Add a / prefix if it's not part of the filename already
+        if(!filename.startsWith("/")) filename = "/" + filename;
+        //Open the file for writing
+        upload_file = SPIFFS.open(filename, "w");   
+    //If the upload is in progress, write the buffer to the file        
+    }else if(upload.status == UPLOAD_FILE_WRITE && upload_file){
+        upload_file.write(upload.buf, upload.currentSize);
+    
+    //If the upload is over, send server status 201 and close the file
+    }else if(upload.status == UPLOAD_FILE_END && upload_file){
+        server.send(201);
+        upload_file.close();
+        //If the settings file was uploaded, restart the ESP
+        if(upload.filename == "settings.txt"){
+            _offline();
+            ESP.restart();
+        } 
+    }
+
+    String upload_status = String(upload.status);
+    websockets_server.sendTXT(websockets_client, upload_status);
+}
+
 /*  begin: Start the web interface
     RETURNS True if the settings file is good, false if it's missing anything
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -465,6 +569,10 @@ bool Web_Interface::begin(){
     //When the settings file is requested or posted, call the corresponding function
     server.on("/settings_data", HTTP_POST, handle_settings_post);
     server.on("/settings_data", HTTP_GET, handle_settings_get);
+    server.on("/nav", HTTP_GET, handle_nav);
+    //When a POST is requested from /upload, send status 200 to initiate upload and call handle_file_upload function repeatedly
+    server.on("/upload", HTTP_POST, [](){ server.send(200); }, handle_file_upload );
+
 
     //If any other file is requested, send it if it exists or send a generic 404 if it doesn't exist
     server.onNotFound([](){
@@ -473,17 +581,18 @@ bool Web_Interface::begin(){
         }
     });
 
-    //If a websockets message comes in, call this function
-    websockets_server.onEvent(websockets_event);
-
     server.begin(); //Start the server
-    websockets_server.begin(); //Start the websockets server
 
-    //If a console.txt file exists, delete it to start with a clean console upon init
-    if(SPIFFS.exists("/www/console.txt")) SPIFFS.remove("/www/console.txt"); 
+    if(console_page){
+        //If a websockets message comes in, call this function
+        websockets_server.onEvent(websockets_event);
+        websockets_server.begin(); //Start the websockets server
+        //If a console.txt file exists, delete it to start with a clean console upon init
+        if(SPIFFS.exists("/www/console.txt")) SPIFFS.remove("/www/console.txt"); 
+    } 
 
     //If the settings file is good, return true. Otherwise, return false. 
-    if(check_settings_file()){
+    if(check_settings_file() || !settings_page){
         return true;
     }
     return false;
@@ -493,35 +602,34 @@ bool Web_Interface::begin(){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Web_Interface::handle(){
     server.handleClient();
-    websockets_server.loop();
+    if(console_page) websockets_server.loop();
 }
 
 /*  console_print: Print to the web console
         output: Text to print
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Web_Interface::console_print(String output){
-    //If there is an active websockets connection, send the text to the client
-    if(websockets_client != -1){
-        websockets_server.sendTXT(websockets_client, output);
-    }
+    if(console_page){
+        //If there is an active websockets connection, send the text to the client
+        if(websockets_client != -1){
+            websockets_server.sendTXT(websockets_client, output);
+        }
 
-    //Open/create the console.txt file in append mode
-    File console = SPIFFS.open("/www/console.txt", "a");
+        //Open/create the console.txt file in append mode
+        File console = SPIFFS.open("/www/console.txt", "a");
 
-    //If the console file is over 10kb, delete it and create a new one. 
-    if(console.size() > 10000){
+        //If the console file is over 10kb, delete it and create a new one. 
+        if(console.size() > 10000){
+            console.close();
+            SPIFFS.remove("/www/console.txt");
+            console = SPIFFS.open("/www/console.txt", "w");
+        }
+
+        //output the current string to the end of the file
+        console.print(output); 
+        //Close the file
         console.close();
-        SPIFFS.remove("/www/console.txt");
-        console = SPIFFS.open("/www/console.txt", "w");
     }
-
-    //output the current string to the end of the file
-    console.print(output); 
-    //Close the file
-    console.close();
-
-    
-
 }
 
 /*  load_setting: 
@@ -542,11 +650,21 @@ String Web_Interface::load_setting(String setting){
         return "";
     } 
 
-    //For each setting category...
-    for(int x = 0; x < doc.size(); x++){
+    //Store whether the settings category exists or not
+    bool advanced = doc.containsKey("advanced");
 
-        //Array of settings in this category
-        JsonArray settings = doc[x]["settings"];
+    //This array holds the settings for the current category
+    JsonArray settings;
+    //Cycle through each setting category
+    for(int i = 0; i < doc.size(); i++){
+        //Load the correct category for the current loop
+        if(i == 0){
+            settings = doc["general"];
+        }else if(advanced && i == 1){
+            settings = doc["advanced"];
+        }else{
+            settings = doc["wifi"];
+        }
         //For each setting...
         for(int i = 0; i < settings.size(); i++){
             //If the current setting is the one specified, return its value

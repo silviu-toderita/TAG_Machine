@@ -157,15 +157,18 @@ bool WiFi_Manager::begin(){
     RETURNS True if hotspot established, false if not.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool WiFi_Manager::create_hotspot(String hotspot_SSID, String hotspot_password){
+    bool success = false;
     //Switch to Access Point mode
     WiFi.mode(WIFI_AP);
     //Begin the hotspot
-    if(WiFi.softAP(hotspot_SSID, hotspot_password)){
-        status = WM_HOTSPOT;
-        return true; //Return true if started
+    if(hotspot_password == ""){
+        if(WiFi.softAP(hotspot_SSID)) success = true;
+    }else{
+        if(WiFi.softAP(hotspot_SSID, hotspot_password)) success = true;
     }
     
-    return false; //Return false if it failed to start
+    if(success) status = WM_HOTSPOT;
+    return success; //Return false if it failed to start
 }
 
 /*  handle: Handler function, run every loop or as often as possible

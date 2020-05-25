@@ -47,7 +47,7 @@
             }
             
             //Load the navbar
-            $.get("/nav.html", function(data){
+            $.get("/nav", function(data){
                 $("#navigation").replaceWith(data);
             });
 
@@ -61,7 +61,7 @@
 
         <!--Main container with a viewport height of 65%-->
         <main class="container" style="height: 65vh">
-            <header class="page-header header container">
+            <header class="page-header header container mb-4">
                 <h2>Console</h2>
             </header>
             

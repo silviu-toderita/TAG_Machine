@@ -1,8 +1,8 @@
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ESP8266 library for connecting to Twilio and sending SMS messages.
 
-    To use, initialize a Twilio object. Send a new message with the send_message()
-    function.
+    To use, initialize a Twilio object and configure with config() function. Send 
+    a new message with the send_message() function.
 
     Created by Silviu Toderita in 2020.
     silviu.toderita@gmail.com

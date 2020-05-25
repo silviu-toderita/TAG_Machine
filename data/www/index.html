@@ -19,7 +19,7 @@
         <script>
             
             //Load the navbar
-            $.get("/nav.html", function(data){
+            $.get("/nav", function(data){
                 $("#navigation").replaceWith(data);
             });
 
@@ -32,9 +32,9 @@
         <div id="navigation"></div>
 
         <!--Main container with a viewport height of 65%-->
-        <main class="container">
-            <h1>Welcome to the web interface for your TAG Machine!</h1>
-        </main>
+        <header class="page-header header container mb-4">
+            <h2>Home</h2>
+        </header>
         
 
     </body>

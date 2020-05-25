@@ -24,7 +24,7 @@
 #include "Thermal_Printer.h" //Silviu's Thermal Printer Library
 
 
-Persistent_Storage phone_book("phone_book"); //Storage object for the phone book
+Persistent_Storage contacts("contacts"); //Storage object for the phone book
 WiFi_Manager WiFi_manager; //WiFi Manager object
 Web_Interface web_interface; //Web Interface Object
 WTA_Clock WTA_clock; //NTP object
@@ -42,10 +42,17 @@ bool WiFi_connection_failed = false; //True if the Wi-Fi Connection has failed o
 String phone_number; //Phone number of the Tag Machine
 String owner_name; //Name of device owner
 String MQTT_address; //URL of the MQTT broker
-String device_name = "tagmachine"; //Device name with default set
-String device_password = "12345678"; //Device password with default set
-uint8_t LED_pin = 4; //ESP pin for LED with default set
-uint8_t button_pin = 5; //ESP pin for button with default set
+
+bool send_replies = true; //SMS replies are on/off default
+
+String local_URL = "tagmachine"; //Local URL to access web interface and OTA updates default
+String hotspot_SSID = "tagmachine"; //Hotspot SSID default
+String hotspot_password = "12345678"; //Hotspot Password default
+String OTA_username = "tagmachine"; //OTA username default
+String OTA_password = "12345678"; //OTA password default
+
+uint8_t LED_pin = 4; //ESP pin for LED default
+uint8_t button_pin = 5; //ESP pin for button default
 
 
 /*  console_print: Print to the web console
@@ -111,62 +118,71 @@ String format_NA_phone_numbers(String input){
         media: Media files (if any), separated by ","
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void process_message(String time, String from_number, String message, String media){
-    //Get the name from the phone book
-    String name = phone_book.get(from_number);
-
     //If the message is ".photo", change photo_mode to true so that the photo is printed by itself
     bool photo_mode = false;
     if(message == "_photo"){
         photo_mode = true;
-    
-    //If the message is ".name", reply with a name update message
-    }else if(message == "_name"){
+    } 
 
-        //If the reply was successfully sent...
-        if(twilio.send_message(from_number, phone_number, "Please reply with a new name within 24hrs to add it to the phone book.")){
-            //Store the timestamp when the request was sent out
-            phone_book.set(from_number, "_REQ" + time);
-        }
+    //The name is the phone number by default
+    String name = from_number;
 
-        //Exit function before printing
-        return;
-    }
+    //If send_replies is on...
+    if(send_replies){
+        
+        //If the message is "_name", reply with a name update message
+        if(message == "_name"){
 
-    //If the TAG machine should request a name, this will be true
-    bool request_name = false;
+            //If the reply was successfully sent...
+            if(twilio.send_message(from_number, phone_number, "Please reply with a new name within 24hrs to add it to the phone book.")){
+                //Store the timestamp when the request was sent out
+                contacts.set(from_number, "_REQ" + time);
+            }
 
-    //If the number is not in the phone-book...
-    if(name == ""){
-        request_name = true;
-    //If a name was requested already and the reply message isn't blank...
-    }else if(name.substring(0,4) == "_REQ"){
-        //If the request is less than 24 hours old...
-        if(time.toInt() <= name.substring(4).toInt() + 86400 && message != ""){
-            //Store the name in the phone book
-            phone_book.set(from_number, message);
-            //Reply with a success message
-            twilio.send_message(from_number, phone_number, "Thanks " + message + ", your name has been added to the phone book. To change your name, reply with \"_name\".");
-    
-            //exit the function before printing
+            //Exit function before printing
             return;
+        }
 
-        //If the request is more than 24 hours old...
-        }else{
+        //Get the name from the phone book
+        name = contacts.get(from_number);
+    
+        //If the TAG machine should request a name, this will be true
+        bool request_name = false;
+
+        //If the number is not in the phone-book...
+        if(name == ""){
             request_name = true;
+        //If a name was requested already and the reply message isn't blank...
+        }else if(name.substring(0,4) == "_REQ"){
+            //If the request is less than 24 hours old...
+            if(time.toInt() <= name.substring(4).toInt() + 86400 && message != ""){
+                //Store the name in the phone book
+                contacts.set(from_number, message);
+                //Reply with a success message
+                twilio.send_message(from_number, phone_number, "Thanks " + message + ", your name has been added to the phone book. To change your name, reply with \"_name\".");
+        
+                //exit the function before printing
+                return;
+
+            //If the request is more than 24 hours old...
+            }else{
+                request_name = true;
+            }
+
         }
 
+        //If request name is true...
+        if(request_name){
+            //Send a message asking the sender to reply with a name. If the reply is successful...
+            if(twilio.send_message(from_number, phone_number, "Thanks for messaging " + owner_name + "'s Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
+                //Store the timestamp when the request was sent out
+                contacts.set(from_number, "_REQ" + time);
+            }
+            //Use the phone number as the name for this message
+            name = from_number;
+        }
     }
 
-    //If request name is true...
-    if(request_name){
-        //Send a message asking the sender to reply with a name. If the reply is successful...
-        if(twilio.send_message(from_number, phone_number, "Thanks for messaging " + owner_name + "'s Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
-            //Store the timestamp when the request was sent out
-            phone_book.set(from_number, "_REQ" + time);
-        }
-        //Use the phone number as the name for this message
-        name = from_number;
-    }
     
     //If photo mode is not on, print text
     if(!photo_mode){
@@ -201,7 +217,7 @@ void process_message(String time, String from_number, String message, String med
             //If it's an unsupported attachment, print that out and reply to the sender
             if(media_filename[i] == "NS"){
                 printer.print_message("<UNSUPPORTED ATTACHMENT>", 1);
-                twilio.send_message(from_number, phone_number, "Sorry, but your message contained media in a format that's not supported by the TAG Machine. Only .jpg, .png, and .gif images are supported.");
+                if(send_replies) twilio.send_message(from_number, phone_number, "Sorry, but your message contained media in a format that's not supported by the TAG Machine. Only .jpg, .png, and .gif images are supported.");
             //Otherwise, print that particular media file
             }else{
                 printer.print_bitmap_http("http://silviutoderita.com/img/" + media_filename[i] + ".dat", 1);
@@ -313,7 +329,7 @@ void connection_failed(){
 void connected(){
     //Print the current Wi-Fi Network
     printer.print_status("WiFi Connected: " + WiFi_manager.get_SSID(), 0);
-    printer.print_status("Access web console at: http://" + String(device_name) + ".local", 1);
+    printer.print_status("Access web console at: http://" + String(local_URL) + ".local", 1);
 
     //Initialize the clock
     WTA_clock.begin();
@@ -348,13 +364,13 @@ void disconnected(){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void create_hotspot(){
     //Create a hotspot
-    WiFi_manager.create_hotspot(device_name, device_password);
+    WiFi_manager.create_hotspot(hotspot_SSID, hotspot_password);
 
     //Print current status
     printer.print_status("Hotspot Started! ", 0);
-    printer.print_status("Network: " + String(device_name), 0);
-    printer.print_status("Password: " + String(device_password), 0);
-    printer.print_status("Access web console at: http://" + String(device_name) + ".local", 1);
+    printer.print_status("Network: " + String(hotspot_SSID), 0);
+    printer.print_status("Password: " + String(hotspot_password), 0);
+    printer.print_status("Access web console at: http://" + String(local_URL) + ".local", 1);
     printer.print_heading("<-- Press Button to Stop Hotspot", 3);
 
 }
@@ -366,13 +382,35 @@ void load_settings(){
     phone_number = web_interface.load_setting("phone_number");
     owner_name = web_interface.load_setting("owner_name");
     MQTT_address = web_interface.load_setting("MQTT_address");
+    OTA_username = web_interface.load_setting("OTA_username");
+    OTA_password = web_interface.load_setting("OTA_password");
     button_pin = web_interface.load_setting("button_pin").toInt();
     LED_pin = web_interface.load_setting("LED_pin").toInt();
 
+    //Load local_URL and filter out prefix and suffix
+    local_URL = web_interface.load_setting("local_URL");
+    if(local_URL.endsWith(".local")) local_URL = local_URL.substring(0,local_URL.length()-6);
+    if(local_URL.startsWith("http://")) local_URL = local_URL.substring(7);
+
+    //Load send_replies and check if value is true or false
+    String send_replies_string = web_interface.load_setting("send_replies");
+    if(send_replies_string == "trueselected"){
+        send_replies = true;
+    }else{
+        send_replies = false;
+    }
+
     //Set up printer, WiFi Manager, and Twilio
     printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt());
-    WiFi_manager.add_network(web_interface.load_setting("WiFi_SSID"),web_interface.load_setting("WiFi_password"));
-    twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"), web_interface.load_setting("Twilio_fingerprint"));
+    printer.set_printing_parameters(web_interface.load_setting("printer_heating_dots").toInt(),web_interface.load_setting("printer_heating_time").toInt(),web_interface.load_setting("printer_heating_interval").toInt());
+    if(send_replies) twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"), web_interface.load_setting("Twilio_fingerprint"));
+
+    //Set up WiFi
+    hotspot_SSID = web_interface.load_setting("hotspot_SSID");
+    hotspot_password = web_interface.load_setting("hotspot_password");
+    WiFi_manager.add_network(web_interface.load_setting("wifi_SSID_1"),web_interface.load_setting("wifi_password_1"));
+    WiFi_manager.add_network(web_interface.load_setting("wifi_SSID_2"),web_interface.load_setting("wifi_password_2"));
+    WiFi_manager.add_network(web_interface.load_setting("wifi_SSID_3"),web_interface.load_setting("wifi_password_3"));
 }
 
 /*  offline: Take SPIFFS and printer offline ahead of restart, to avoid file system corruption and garbage printer output
@@ -392,12 +430,12 @@ void init_basics(){
     pinMode(LED_pin, OUTPUT);
     digitalWrite(LED_pin, LOW); 
     
-    //Start the multicast DNS with the device_name as the address
-    MDNS.begin(device_name);
+    //Initialize MDNS
+    MDNS.begin(local_URL);
 
     //Start the OTA updater using the device_name as the hostname and device_password as the password
-    ArduinoOTA.setHostname(device_name.c_str()); 
-    ArduinoOTA.setPassword(device_password.c_str()); 
+    ArduinoOTA.setHostname(OTA_username.c_str()); 
+    ArduinoOTA.setPassword(OTA_password.c_str()); 
     //When an OTA update starts...
     ArduinoOTA.onStart([](){
         //Take the printer offline
@@ -414,7 +452,7 @@ void bootloader(bool web_interface_on){
     //Initialize basic functions
     init_basics();
     //Create a hotspot
-    WiFi_manager.create_hotspot(device_name, device_password);
+    WiFi_manager.create_hotspot(hotspot_SSID, hotspot_password);
 
     bool LED_on = false;
     //Loop forever
