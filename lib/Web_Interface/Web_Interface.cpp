@@ -547,9 +547,9 @@ void handle_file_upload(){
         upload_file.write(upload.buf, upload.currentSize);
     
     //If the upload is over, send server status 201 and close the file
-    }else if(upload.status == UPLOAD_FILE_END && upload_file){
+    }else if(upload.status == UPLOAD_FILE_END){
         server.send(201);
-        upload_file.close();
+        if(upload_file) upload_file.close();
         //If the settings file was uploaded, restart the ESP
         if(upload.filename == "settings.txt"){
             _offline();
