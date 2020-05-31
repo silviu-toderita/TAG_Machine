@@ -18,12 +18,13 @@ const JIMP = require('jimp'); //Javascript Image Manipulation Program
 const storage = require('node-persist'); //Persistent Storage Library
 const twilio = require('twilio'); //Twilio library
 
-//Settings
-const MQTT_broker_username = 'silviu';
-const MQTT_broker_password = 'sebastian';
-const www_root_folder = '/var/www/silviutoderita-com/';
-const webhook_URL = 'https://silviutoderita.com/twilio/';
-const Twilio_auth_token = '9cc8633f6e84411fd69e2a17b3e82258';
+//Load settings from config file
+var config = JSON.parse(fs.readFileSync('config.json'));
+var MQTT_broker_username = config.MQTT_broker_username;
+var MQTT_broker_password = config.MQTT_broker_password;
+var www_root_folder = config.www_root_folder;
+var webhook_URL = config.webhook_URL;
+var Twilio_auth_token = config.Twilio_auth_token;
 
 //Initialize the storage object
 storage.init();
