@@ -25,9 +25,8 @@ Twilio::Twilio(){
         auth_token_in: Twilio account auth token
         fingerprint_in: Twilio SHA1 fingerprint
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Twilio::config(String account_sid_in, String auth_token_in, String fingerprint_in){
+void Twilio::config(String account_sid_in, String auth_token_in){
         account_sid = account_sid_in;
-        fingerprint = fingerprint_in;
         auth_header = get_auth_header(account_sid, auth_token_in);
 }
 
@@ -46,12 +45,12 @@ bool Twilio::send_message(String to, String from, String message)
 
     // Use WiFiClientSecure class to create TLS 1.2 connection
     WiFiClientSecure client;
-    //Set the current Twilio fingerprint
-    client.setFingerprint(fingerprint.c_str());
-
-    // Connect to Twilio's REST API and verify the fingerprint
+    
+    client.setInsecure();
+    client.setTimeout(5000);
+    
+    // Connect to Twilio's REST API
     if (!client.connect(host, httpsPort)) return false;
-    if (!client.verify(fingerprint.c_str(), host)) return false;
 
     //Create the post data String
     String post_data = "To=" + urlencode(to) + "&From=" + urlencode(from) + \

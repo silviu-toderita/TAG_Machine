@@ -22,10 +22,10 @@
     "desc":"The Auth Token for your Twilio account. Get this from your Twilio dashboard.",
     "req":true},
 
-    {"id":"MQTT_address",
+    {"id":"bridge_URL",
     "type":"text",
-    "name":"MQTT Broker URL*",
-    "desc":"The URL of the MQTT broker used to relay messages.",
+    "name":"Bridge URL*",
+    "desc":"The URL of the Twilio-MQTT bridge used to relay messages.",
     "req":true},
 
     {"id":"send_replies",
@@ -109,14 +109,7 @@
     "desc":"The ESP pin used for the LED ground.",
     "req":true,
     "val":4,
-    "opt":[0,1,2,3,4,5,9,10,12,13,14,15,16]},
-
-    {"id":"Twilio_fingerprint",
-    "type":"text",
-    "name":"Twilio Fingerprint*",
-    "desc":"The SHA1 fingerprint for the Twilio API. If this changes, you can get the new fingerprint from the SSL certificate of api.twilio.com.",
-    "req":true,
-    "val":"BC B0 1A 32 80 5D E6 E4 A2 29 66 2B 08 C8 E0 4C 45 29 3F D0"}
+    "opt":[0,1,2,3,4,5,9,10,12,13,14,15,16]}
     ],
 "wifi":[
     {"id":"hotspot_SSID",

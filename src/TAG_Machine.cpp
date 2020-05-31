@@ -41,7 +41,7 @@ bool WiFi_connection_failed = false; //True if the Wi-Fi Connection has failed o
 //Settings
 String phone_number; //Phone number of the Tag Machine
 String owner_name; //Name of device owner
-String MQTT_address; //URL of the MQTT broker
+String bridge_URL; //URL of the MQTT broker
 
 bool send_replies = true; //SMS replies are on/off default
 
@@ -220,7 +220,7 @@ void process_message(String time, String from_number, String message, String med
                 if(send_replies) twilio.send_message(from_number, phone_number, "Sorry, but your message contained media in a format that's not supported by the TAG Machine. Only .jpg, .png, and .gif images are supported.");
             //Otherwise, print that particular media file
             }else{
-                printer.print_bitmap_http("http://silviutoderita.com/img/" + media_filename[i] + ".dat", 1);
+                printer.print_bitmap_http("http://" + bridge_URL + "/img/" + media_filename[i] + ".dat", 1);
             }
         }
         
@@ -337,7 +337,6 @@ void connected(){
     //If the connection to the MQTT broker is unssuccessful, print an error and let the user know connection will continue to be attempted automatically
     if(!connect_to_MQTT()){
         printer.print_error("Unable to connect to message server! Check your internet connection.", 0);
-        printer.print_status(MQTT_address, 0);
         printer.print_status("Attempting to connect...", 2);
     } 
 
@@ -381,7 +380,9 @@ void load_settings(){
     //Load variables
     phone_number = web_interface.load_setting("phone_number");
     owner_name = web_interface.load_setting("owner_name");
-    MQTT_address = web_interface.load_setting("MQTT_address");
+    bridge_URL = web_interface.load_setting("bridge_URL");
+    if(bridge_URL.startsWith("http://")) bridge_URL = bridge_URL.substring(7);
+    if(bridge_URL.startsWith("https://")) bridge_URL = bridge_URL.substring(8);
     OTA_username = web_interface.load_setting("OTA_username");
     OTA_password = web_interface.load_setting("OTA_password");
     button_pin = web_interface.load_setting("button_pin").toInt();
@@ -391,6 +392,7 @@ void load_settings(){
     local_URL = web_interface.load_setting("local_URL");
     if(local_URL.endsWith(".local")) local_URL = local_URL.substring(0,local_URL.length()-6);
     if(local_URL.startsWith("http://")) local_URL = local_URL.substring(7);
+    if(local_URL.startsWith("https://")) local_URL = local_URL.substring(8);
 
     //Load send_replies and check if value is true or false
     String send_replies_string = web_interface.load_setting("send_replies");
@@ -403,7 +405,7 @@ void load_settings(){
     //Set up printer, WiFi Manager, and Twilio
     printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt());
     printer.set_printing_parameters(web_interface.load_setting("printer_heating_dots").toInt(),web_interface.load_setting("printer_heating_time").toInt(),web_interface.load_setting("printer_heating_interval").toInt());
-    if(send_replies) twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"), web_interface.load_setting("Twilio_fingerprint"));
+    if(send_replies) twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"));
 
     //Set up WiFi
     hotspot_SSID = web_interface.load_setting("hotspot_SSID");
@@ -522,9 +524,7 @@ void setup() {
     printer.print_bitmap_file(file, 2, "TAG MACHINE");
     file.close();
 
-    //If the MQTT address starts with http://, remove it and continue
-    if(MQTT_address.substring(0, 7) == "http://") MQTT_address = MQTT_address.substring(7);
-    MQTT_client.setServer(MQTT_address.c_str(), 1883);
+    MQTT_client.setServer(bridge_URL.c_str(), 1883);
     //Set callback for incoming message from MQTT
     MQTT_client.setCallback(new_message);
     

@@ -1,110 +1,29 @@
-const http = require('http'); 
-const express = require('express');
-const {urlencoded} = require('body-parser');
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    TAG_Bridge is a Twilio to MQTT bridge running on Node.js. It can receive new 
+    messages at a Webhook that Twilio can point to, and send them to a local MQTT
+    broker (running on the same server). 
+
+    Created by Silviu Toderita in 2020.
+    silviu.toderita@gmail.com
+    silviutoderita.com
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+const http = require('http'); //HTTP Library
+const express = require('express'); //Express framework
+const {urlencoded} = require('body-parser'); //URL Decoding library
 const mqtt = require('mqtt'); //MQTT Library
-const floydSteinberg = require('floyd-steinberg'); //Dithering Library
+const dither = require('floyd-steinberg'); //Dithering Library
 const fs = require('fs'); //File System Library
-const Jimp = require('jimp'); //Javascript Image Manipulation Program
-const storage = require('node-persist');
+const JIMP = require('jimp'); //Javascript Image Manipulation Program
+const storage = require('node-persist'); //Persistent Storage Library
+const twilio = require('twilio'); //Twilio library
 
-
-//Buffer object that can be assigned 1 byte or 1 bit at a time
-function BitBuffer(size){
-    this.buffer = Buffer.alloc(Math.floor(size/8)); //Initialize a byte buffer
-    var currentBit = 0; //Start us off at bit 0
-
-    //Function for setting a single bit
-    this.setBit = function(value) {
-        var byte = Math.floor(currentBit / 8); //Determine which byte we're on
-        var bit = 7 - (currentBit % 8); //Determine which bit of the current byte we're on
-    
-        //If the bit should be zero, set it to 0
-        if(value == 0){
-            this.buffer[byte] &=  ~(1 << bit);
-        //Otherwise, set it to 1
-        }else{
-            this.buffer[byte] |= (1 << bit);
-        }
-        //Increment the current bit by one
-        currentBit++;
-    }
-
-    //Function for setting a single byte. Note that this function will overwrite any bits written to the current byte already
-    this.setByte = function(value){
-        var byte = Math.floor(currentBit / 8); //Determine which byte we're on
-        this.buffer[byte] = value; //Set the value
-
-        currentBit = currentBit + 8; //Increment the current bit by 8
-    }
-
-}
-
-//This function saves the image as a 1-bit bitmap text file
-function saveImage(URL){
-
-    //Wrap function in promise to only return once processing is done
-    return new Promise(function(resolve, reject){
-        //Read the image
-        Jimp.read(URL, async (err, image) => {
-            if(!image){
-                resolve("NS");
-                return;
-            }
-            
-            //Scale it to fit the maximum width of 384
-            image.scaleToFit(384, Jimp.AUTO);
-
-            //The amount of pixels in this image
-            var size = image.bitmap.width * image.bitmap.height; 
-    
-            //Go through each pixel. If any pixel has slight transparency and is black, change it to white. 
-            for(var i = 0; i < size * 4; i = i + 4){
-                if(image.bitmap.data[i+3] < 255 && image.bitmap.data[i] == 0 && image.bitmap.data[i+1] == 0 && image.bitmap.data[i+2] == 0){
-                    image.bitmap.data[i] = 255;
-                    image.bitmap.data[i+1] = 255;
-                    image.bitmap.data[i+2] = 255;
-                }
-            }
-    
-            //Dither the image, turning it into a 1-bit bitmap
-            var ditherImage = floydSteinberg(image.bitmap);
-    
-            //Create new bit buffer
-            let buffer = new BitBuffer(size + 16);
-            
-            //Assign the first 2 bytes of the buffer to the height
-            buffer.setByte(Math.floor(ditherImage.height/256));
-            buffer.setByte(ditherImage.height%256);
-    
-            //Write each pixel to the buffer. We only write every 4th pixel, as the bitmap is still in 32-bit format. 
-            for(var i = 0; i < size * 4; i = i + 4){
-                if(ditherImage.data[i] == 0){
-                    buffer.setBit(1);
-                }else{
-                    buffer.setBit(0);
-                }
-    
-            }
-            
-            //Get the current image number based on the last image number, so that we can store up to 256 images at once in case the tag machine is offline
-            var imageNum = 1;
-            var storedImageNum = await storage.getItem('imageNum');
-            if(storedImageNum < 255){
-                imageNum = storedImageNum + 1;
-            }
-
-            //Output the file
-            fs.writeFileSync("/var/www/silviutoderita-com/img/" + imageNum + ".dat", buffer.buffer);
-
-            //Store this imagenumber
-            await storage.setItem('imageNum', imageNum);
-
-            //Resolve the promise once all the image processing is done
-            resolve(imageNum);
-        });
-    });
-    
-}
+//Settings
+const MQTT_broker_username = 'silviu';
+const MQTT_broker_password = 'sebastian';
+const www_root_folder = '/var/www/silviutoderita-com/';
+const webhook_URL = 'https://silviutoderita.com/twilio/';
+const Twilio_auth_token = '9cc8633f6e84411fd69e2a17b3e82258';
 
 //Initialize the storage object
 storage.init();
@@ -112,32 +31,153 @@ storage.init();
 //Connect to the local MQTT Server
 var mqtt_client = mqtt.connect('http://localhost', {
     port: 1883,
-    username: 'silviu',
-    password: 'sebastian'
+    username: MQTT_broker_username,
+    password: MQTT_broker_password
 });
 
+//Use express library
+const app = express();
+app.use(urlencoded({ extended: false}));
 
-//Publish MQTT message
-async function sendMessage(data){
-    var media; //This variable will store any image numbers in this message
+/*  bit_buffer: Buffer object that can be assigned 1 byte or 1 bit at a time. 
+        size: Size in bytes
+        FUNCTIONS:
+            set_bit: Set the next bit
+                value: True or False
+            set_byte: Set the next byte. If the last byte was incomplete (ie. only 3 bits written), it will write to the last byte and overwrite the set bits. 
+                value: Byte to set
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+function bit_buffer(size){
+    this.buffer = Buffer.alloc(Math.floor(size/8)); //Initialize a byte buffer
+    var current_bit = 0; //Start at bit 0
+
+    //Function for setting a single bit
+    this.set_bit = function(value) {
+        
+        var byte = Math.floor(current_bit / 8); 
+        //Determine the current bit
+        var bit = 7 - (current_bit % 8); 
+    
+        //If the bit is zero, set the next bit to 0
+        if(value == 0){
+            this.buffer[byte] &=  ~(1 << bit);
+        //Otherwise, set the next bit to 1
+        }else{
+            this.buffer[byte] |= (1 << bit);
+        }
+        //Increment the current bit by one
+        current_bit++;
+    }
+
+    //Function for setting a single byte
+    this.set_byte = function(value){
+        //Determine the current byte
+        var byte = Math.floor(current_bit / 8);
+        //Set the next byte
+        this.buffer[byte] = value;
+
+        //Increment the current bit by 8
+        current_bit = current_bit + 8; 
+    }
+
+}
+
+/*  save_image: Download the specified image and save it as a 1-bit bitmap in a custom format that the TAG Machine can read
+        URL: URL of the image to download
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+function save_image(URL){
+    //Wrap function in promise to only return once processing is done
+    return new Promise(function(resolve, reject){
+        //Read the image
+        JIMP.read(URL, async (err, image) => {
+            //If the image is not a supported format, return "NS"
+            if(!image){
+                resolve("NS");
+                return;
+            }
+            
+            //Scale the image to fit the maximum width of 384
+            image.scaleToFit(384, JIMP.AUTO);
+
+            //Calculate the amount of pixels in the image
+            var size = image.bitmap.width * image.bitmap.height; 
+    
+            //Iterate through each pixel and check for transparency
+            for(var i = 0; i < size * 4; i = i + 4){
+                //If there is any transparency and the colour is black...
+                if(image.bitmap.data[i+3] < 255 && image.bitmap.data[i] == 0 && image.bitmap.data[i+1] == 0 && image.bitmap.data[i+2] == 0){
+                    //Change the pixel to white
+                    image.bitmap.data[i] = 255;
+                    image.bitmap.data[i+1] = 255;
+                    image.bitmap.data[i+2] = 255;
+                }
+            }
+    
+            //Dither the image, turning it into a 1-bit bitmap
+            var processed_image = dither(image.bitmap);
+    
+            //Create new bit buffer with the size of the image plus 2 bytes for height information
+            let buffer = new bit_buffer(size + 16);
+            
+            //Assign the first 2 bytes of the buffer to the height
+            buffer.set_byte(Math.floor(processed_image.height/256));
+            buffer.set_byte(processed_image.height%256);
+    
+            //Write each pixel to the buffer. Only write every 4th pixel, as the bitmap is still in 32-bit format. 
+            for(var i = 0; i < size * 4; i = i + 4){
+                if(processed_image.data[i] == 0){
+                    buffer.set_bit(1);
+                }else{
+                    buffer.set_bit(0);
+                }
+    
+            }
+            
+            //Get the current image number based on the last image number
+            var image_number = 1;
+            var last_image_number = await storage.getItem('image_number');
+            if(last_image_number < 255){
+                image_number = last_image_number + 1;
+            }
+
+            //Output the file
+            fs.writeFileSync(www_root_folder + "img/" + image_number + ".dat", buffer.buffer);
+
+            //Store this imagenumber
+            await storage.setItem('image_number', image_number);
+
+            //Resolve the promise and return the image number
+            resolve(image_number);
+        });
+    });
+    
+}
+
+/*  publish_MQTT_message: Publish a message to the MQTT server
+        data: Data to publish in the message
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+async function publish_MQTT_message(data){
+    //This variable will store any image numbers in this message
+    var media; 
     //If there are no images, send 0
-    if(data.numMedia == 0){
+    if(data.image_count == 0){
         media = '0';
+    //If there are images...
     }else{
-        //If there are images, save each one and add its number to the media variable
-        for(var i = 0; i < data.numMedia; i++){
+        //For each image...
+        for(var i = 0; i < data.image_count; i++){
             //Store the image number after the image is processed
-            var currentImg = String(await saveImage(data.media[i]));
+            var current_image = String(await save_image(data.media[i]));
             
             //Add the image number to the media var
             if(media){
-                media = media + currentImg;
+                media = media + current_image;
             }else{
-                media = currentImg;
+                media = current_image;
             }
 
-            //If it's not the last image, add a comma to media
-            if(i != data.numMedia - 1){
+            //If it's not the last image, add a comma to media string
+            if(i != data.image_count - 1){
                 media = media + ',';
             }
         }
@@ -152,27 +192,27 @@ async function sendMessage(data){
     console.log(`Published MQTT Message!\nTopic: smsin-${data.to} \nMessage:\n----\n${mqtt_message}\n----------------`); 
 }
 
-
-//Use express library
-const app = express();
-app.use(urlencoded({ extended: false}));
-
-//Do this if a POST request is received
-app.post( '/sms', (req, res)  => {
-
+//Do this if a POST request is received to /sms
+app.post( '/', (req, res)  => {
     console.log(`Webhook received from Twilio...`);
 
-    //Respond to Twilio so it's happy
+    const request_is_valid = twilio.validateRequest(Twilio_auth_token, req.headers['x-twilio-signature'], webhook_URL, req.body);
+
+    if(!request_is_valid){
+        return res.status(401).send('Unauthorized');
+    }
+
+    //Respond to Twilio with a message to acknowledge receipt
     res.writeHead(200, {'Content-Type': 'text/xml'});
     res.end('<Response></Response>');
 
-    //Send a message using MQTT, pass all relevant data from Twilio's webhook
-    sendMessage({
+    //Send a message to the MQTT broker, pass all relevant data from Twilio's webhook
+    publish_MQTT_message({
         to: req.body.To.slice(1),
         from: req.body.From.slice(1),
         id: req.body.MessageSid,
         body: req.body.Body,
-        numMedia: parseInt(req.body.NumMedia),
+        image_count: parseInt(req.body.NumMedia),
         media: [
             req.body.MediaUrl0,
             req.body.MediaUrl1,

@@ -9,7 +9,7 @@ class Twilio {
         Twilio();
 
         void 
-            config (String, String, String);
+            config (String, String);
 
         bool 
             send_message(String, String, String);
@@ -21,6 +21,5 @@ class Twilio {
             
         //Account ID, Twilio fingerprint, and auth header created from account ID and auth token
         String account_sid;
-        String fingerprint;
         String auth_header;
 };

@@ -301,58 +301,64 @@ void Thermal_Printer::print_bitmap_http(String URL, uint8_t feed_amount){
 		//If the HTTP code says there is a file found...
 		if (HTTP_code == HTTP_CODE_OK) {
 
-		// Get TCP stream
-		WiFiClient * stream = http.getStreamPtr();
+            // Get TCP stream
+            WiFiClient * stream = http.getStreamPtr();
 
-		wake();
+            wake();
 
-		uint16_t height;
-		uint8_t byte_counter = 0;
-		while(byte_counter < 2){
-			//Wait for a byte to be available
-			while(!stream->available()) yield();
-			//The first byte is height * 256
-			if(byte_counter == 0){
-			height = stream->read() * 256;
-			byte_counter = 1;
-			//The second byte is additional height
-			}else{
-			height += stream->read();
-			byte_counter = 2;
-			}
-			
-		}
+            uint16_t height;
+            uint8_t byte_counter = 0;
+            while(byte_counter < 2){
+                //Wait for a byte to be available
+                while(!stream->available()) yield();
+                //The first byte is height * 256
+                if(byte_counter == 0){
+                height = stream->read() * 256;
+                byte_counter = 1;
+                //The second byte is additional height
+                }else{
+                height += stream->read();
+                byte_counter = 2;
+                }
+                
+            }
 
-		//While there are still lines to print
-		while(height != 0){
-			//Print up to 255 lines per chunk
-			uint8_t chunk_height = 255;
-			//If there are less than 255 lines left, the chunk will be exactly the height remaining
-			if(height < 255){
-			chunk_height = height;
-			}
+            //While there are still lines to print
+            while(height != 0){
+                //Print up to 255 lines per chunk
+                uint8_t chunk_height = 255;
+                //If there are less than 255 lines left, the chunk will be exactly the height remaining
+                if(height < 255){
+                chunk_height = height;
+                }
 
-			//Write full-width bitmap
-			write_bytes(ASCII_DC2, '*', chunk_height, 48);
+                //Write full-width bitmap
+                write_bytes(ASCII_DC2, '*', chunk_height, 48);
 
-			//For each line, write the next 48 bytes
-			for(int i = 0; i < (chunk_height * 48); i++){
-			//Wait for a byte to be available
-			while(!stream->available()) yield();
-			//Write the byte
-			write_bytes(stream->read());
-			}
-			//Height remaining = last height remaining - how much we printed this chunk
-			height = height - chunk_height;
-		}
+                //For each line, write the next 48 bytes
+                for(int i = 0; i < (chunk_height * 48); i++){
+                //Wait for a byte to be available
+                while(!stream->available()) yield();
+                //Write the byte
+                write_bytes(stream->read());
+                }
+                //Height remaining = last height remaining - how much we printed this chunk
+                height = height - chunk_height;
+            }
+            _print_callback("<IMAGE>");
 
-		_print_callback("<IMAGE>");
+        //If the HTTP status was anything other than 200 OK, print an error with the status
+		}else{
+            print_error("Image Download Failed with HTTP Status: " + String(HTTP_code), 0);
+        }
+    //If there was no valid HTTP status, print an error
+	}else{
+        print_message("Image Download Failed", 0);
 
-		feed(feed_amount);
-		sleep();
+    }
 
-		}
-	}
+	feed(feed_amount);
+	sleep();
 
 	//Close the connection
 	http.end();
