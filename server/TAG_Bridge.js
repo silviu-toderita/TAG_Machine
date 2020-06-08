@@ -201,6 +201,7 @@ app.post( '/', (req, res)  => {
 
     if(!request_is_valid){
         return res.status(401).send('Unauthorized');
+        console.log('Unauthorized Request!');
     }
 
     //Respond to Twilio with a message to acknowledge receipt
