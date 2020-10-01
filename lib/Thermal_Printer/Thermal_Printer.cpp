@@ -281,6 +281,34 @@ void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount, String d
 
 }
 
+void Thermal_Printer::print_bitmap_file_test(File file){    
+    wake();
+    
+    write_bytes(ASCII_GS, '*', 1, 3);
+    for(int i = 0; i < 24; i++){
+        write_bytes(127);
+    }
+
+    output("Before");
+    write_bytes(ASCII_GS, 'L', 72, 0);
+    write_bytes(ASCII_GS, '/', 2);
+    write_bytes(ASCII_GS, 'L', 0, 0);
+    output("After");
+
+
+    /*
+    Serial.print("Before");
+
+    write_bytes(ASCII_ESC, '*', 32, 12, 0);
+    for(int i = 0; i < 36; i++){
+        write_bytes(127);
+    }
+
+    output("After");*/
+
+    sleep();
+}
+
 /*	print_bitmap_http: Print a bitmap from web
 		URL: The URL of the file to read from. First byte is height in pixels x 256, 
 			second byte is height (ie. 384 pixel height will be 1, 128). Starting from 
@@ -369,13 +397,13 @@ void Thermal_Printer::print_bitmap_http(String URL, uint8_t feed_amount){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::wake() {
 	write_bytes(ASCII_ESC, '8', 0, 0);
-	delay(20); //If we don't wait a bit, the printer won't be ready to print
+	delay(50); //If we don't wait a bit, the printer won't be ready to print
 }
 
 /*	(private) sleep: Put the printer to sleep after printing.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::sleep() {
-  	write_bytes(ASCII_ESC, '8', 5, 5 >> 8);
+  	write_bytes(ASCII_ESC, '8', 1, 1 >> 8);
 }
 
 /*	(private) wait: Check the printer buffer and wait while it's full.
@@ -400,14 +428,37 @@ void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c) {
 	wait();
 	Serial.write(a);
 	Serial.write(b);
+    wait();
 	Serial.write(c);
 }
 void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
 	wait();
 	Serial.write(a);
 	Serial.write(b);
+    wait();
 	Serial.write(c);
 	Serial.write(d);
+}
+void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e) {
+	wait();
+	Serial.write(a);
+	Serial.write(b);
+    wait();
+	Serial.write(c);
+	Serial.write(d);
+    wait();
+    Serial.write(e);
+}
+void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f) {
+	wait();
+	Serial.write(a);
+	Serial.write(b);
+    wait();
+	Serial.write(c);
+	Serial.write(d);
+    wait();
+    Serial.write(e);
+	Serial.write(f);
 }
 
 /*	(private) output: Write text to the printer.

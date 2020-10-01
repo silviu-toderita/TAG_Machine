@@ -193,7 +193,7 @@ async function publish_MQTT_message(data){
     console.log(`Published MQTT Message!\nTopic: smsin-${data.to} \nMessage:\n----\n${mqtt_message}\n----------------`); 
 }
 
-//Do this if a POST request is received to /sms
+//Do this if a POST request is received to /
 app.post( '/', (req, res)  => {
     console.log(`Webhook received from Twilio...`);
 

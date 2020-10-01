@@ -229,6 +229,44 @@ void process_message(String time, String from_number, String message, String med
     //Print a 4px line
     if(!photo_mode)printer.print_line(4, 4);
 
+    //File file = SPIFFS.open("/happy.dat", "r");
+    //printer.print_bitmap_file_test(file);
+    //file.close();
+}
+
+/*  remove_emojis: Removes any UTF-8 characters from a string which are not US-ASCII (includes all emojis)
+        input: String to process
+    RETURNS Processed string
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+String remove_emojis(String input){
+    //Define the character to use to replace non ASCII charactes
+    const char blank_char = 178;
+    //This string will hold the output
+    String output = "";
+
+    //Go through each character in the input
+    for(int i = 0; i < input.length(); i++){
+        //Pull the current character
+        char current_char = input.charAt(i);
+        //If the character is a single-byte UTF-8 character, copy it to the output
+        if(current_char < 192){
+            output += String(current_char);
+        //If the character is a 2 byte UTF-8 character, replace it with the blank character and skip 1 byte
+        }else if(current_char >= 192 && current_char < 224){
+            output += blank_char;
+            i++;
+        //If the character is a 3 byte UTF-8 character, replace it with the blank character and skip 2 bytes
+        }else if(current_char >= 224 && current_char < 240){
+            output += blank_char;
+            i = i + 2;
+        //If the character is a 4 byte UTF-8 character, replace it with the blank character and skip 3 bytes
+        }else{
+            output += blank_char;
+            i = i + 3;
+        }
+    }
+
+    return output;
 }
 
 /*  new_message: Called when a new message is received via MQTT
@@ -252,7 +290,7 @@ void new_message(char* topic, byte* payload, unsigned int length){
 
     //Sometimes duplicates come in, so always save ID of last message so it isn't processed twice
     if(id != last_message_ID){
-        process_message(time, from_number, body, media);
+        process_message(time, from_number, remove_emojis(body), media);
         last_message_ID = id;
     }
 
