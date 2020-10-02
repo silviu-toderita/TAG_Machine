@@ -6,6 +6,7 @@
     silviu.toderita@gmail.com
     silviutoderita.com
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+//Emoji Support!
 
 #include "Arduino.h" //Arduino Library
 #include "Persistent_Storage.h" //Silviu's persistent storage library
