@@ -25,6 +25,7 @@ var MQTT_broker_password = config.MQTT_broker_password;
 var www_root_folder = config.www_root_folder;
 var webhook_URL = config.webhook_URL;
 var Twilio_auth_token = config.Twilio_auth_token;
+var emoji = require('node-emoji');
 
 //Initialize the storage object
 storage.init();
@@ -186,14 +187,14 @@ async function publish_MQTT_message(data){
     }
 
     //Form the MQTT message
-    mqtt_message = `id:${data.id}\nfrom:${data.from}\nbody:${data.body}\nmedia:${media}\ntime:${data.time}`;
+    mqtt_message = `id:${data.id}\nfrom:${data.from}\nbody:${emoji.unemojify(data.body)}\nmedia:${media}\ntime:${data.time}`;
 
     //Publish the MQTT message
     mqtt_client.publish(`smsin-${data.to}`, mqtt_message, {qos:1});
     console.log(`Published MQTT Message!\nTopic: smsin-${data.to} \nMessage:\n----\n${mqtt_message}\n----------------`); 
 }
 
-//Do this if a POST request is received to /
+//Do this if a POST request is received to /sms
 app.post( '/', (req, res)  => {
     console.log(`Webhook received from Twilio...`);
 

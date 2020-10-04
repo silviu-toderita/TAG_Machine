@@ -230,9 +230,6 @@ void process_message(String time, String from_number, String message, String med
     //Print a 4px line
     if(!photo_mode)printer.print_line(4, 4);
 
-    //File file = SPIFFS.open("/happy.dat", "r");
-    //printer.print_bitmap_file_test(file);
-    //file.close();
 }
 
 /*  remove_emojis: Removes any UTF-8 characters from a string which are not US-ASCII (includes all emojis)

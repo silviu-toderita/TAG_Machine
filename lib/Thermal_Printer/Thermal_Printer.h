@@ -31,7 +31,6 @@ class Thermal_Printer{
             print_error(String, uint8_t),
             print_line(uint8_t, uint8_t),
             print_bitmap_file(File, uint8_t, String),
-            print_bitmap_file_test(File),
             print_bitmap_http(String, uint8_t),
             feed(uint8_t);
 

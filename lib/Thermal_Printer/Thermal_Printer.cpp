@@ -281,34 +281,6 @@ void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount, String d
 
 }
 
-void Thermal_Printer::print_bitmap_file_test(File file){    
-    wake();
-    
-    write_bytes(ASCII_GS, '*', 1, 3);
-    for(int i = 0; i < 24; i++){
-        write_bytes(127);
-    }
-
-    output("Before");
-    write_bytes(ASCII_GS, 'L', 72, 0);
-    write_bytes(ASCII_GS, '/', 2);
-    write_bytes(ASCII_GS, 'L', 0, 0);
-    output("After");
-
-
-    /*
-    Serial.print("Before");
-
-    write_bytes(ASCII_ESC, '*', 32, 12, 0);
-    for(int i = 0; i < 36; i++){
-        write_bytes(127);
-    }
-
-    output("After");*/
-
-    sleep();
-}
-
 /*	print_bitmap_http: Print a bitmap from web
 		URL: The URL of the file to read from. First byte is height in pixels x 256, 
 			second byte is height (ie. 384 pixel height will be 1, 128). Starting from 
