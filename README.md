@@ -1,7 +1,7 @@
 # TAG (Text And Graphics) Machine
 ![Animated GIF of TAG Machine](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Animated.gif?raw=true)
 
-A table-top device that can receive text (SMS) and picture (MMS) messages at its own phone number. Built around an ESP8266 (NodeMCU 1.0 or equivalent) microcontroller. Written in C++ using the Arduino framework. Under active development as of June 2020. 
+A table-top device that can receive text (SMS) and picture (MMS) messages at its own phone number. Emojis are converted to text before being printed. Built around an ESP8266 (NodeMCU 1.0 or equivalent) microcontroller. Written in C++ using the Arduino framework. Under active development as of Oct 2020. 
 
 ## Getting Started (Software)
 
