@@ -49,7 +49,6 @@ bool send_replies = true; //SMS replies are on/off default
 String local_URL = "tagmachine"; //Local URL to access web interface and OTA updates default
 String hotspot_SSID = "tagmachine"; //Hotspot SSID default
 String hotspot_password = "12345678"; //Hotspot Password default
-String OTA_username = "tagmachine"; //OTA username default
 String OTA_password = "12345678"; //OTA password default
 
 uint8_t LED_pin = 4; //ESP pin for LED default
@@ -363,12 +362,16 @@ void connection_failed(){
 /*  connected: Called when WiFi_manager confirms that an IP address has been assigned
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void connected(){
+
     //Print the current Wi-Fi Network
     printer.print_status("WiFi Connected: " + WiFi_manager.get_SSID(), 0);
     printer.print_status("Access web console at: http://" + String(local_URL) + ".local", 1);
 
     //Initialize the clock
     WTA_clock.begin();
+
+    //Initialize MDNS
+    MDNS.begin(local_URL);
 
     //If the connection to the MQTT broker is unssuccessful, print an error and let the user know connection will continue to be attempted automatically
     if(!connect_to_MQTT()){
@@ -407,7 +410,8 @@ void create_hotspot(){
     printer.print_status("Password: " + String(hotspot_password), 0);
     printer.print_status("Access web console at: http://" + String(local_URL) + ".local", 1);
     printer.print_heading("<-- Press Button to Stop Hotspot", 3);
-
+    //Initialize MDNS
+    MDNS.begin(local_URL);
 }
 
 /*  load_settings: Load the settings from the settings file
@@ -419,7 +423,6 @@ void load_settings(){
     bridge_URL = web_interface.load_setting("bridge_URL");
     if(bridge_URL.startsWith("http://")) bridge_URL = bridge_URL.substring(7);
     if(bridge_URL.startsWith("https://")) bridge_URL = bridge_URL.substring(8);
-    OTA_username = web_interface.load_setting("OTA_username");
     OTA_password = web_interface.load_setting("OTA_password");
     button_pin = web_interface.load_setting("button_pin").toInt();
     LED_pin = web_interface.load_setting("LED_pin").toInt();
@@ -467,12 +470,9 @@ void init_basics(){
     pinMode(button_pin, INPUT_PULLUP);
     pinMode(LED_pin, OUTPUT);
     digitalWrite(LED_pin, LOW); 
-    
-    //Initialize MDNS
-    MDNS.begin(local_URL);
 
-    //Start the OTA updater using the device_name as the hostname and device_password as the password
-    ArduinoOTA.setHostname(OTA_username.c_str()); 
+    //Start the OTA updater using the device_password as the password
+    ArduinoOTA.setHostname("tagmachine");
     ArduinoOTA.setPassword(OTA_password.c_str()); 
     //When an OTA update starts...
     ArduinoOTA.onStart([](){
@@ -491,7 +491,7 @@ void bootloader(bool web_interface_on){
     init_basics();
     //Create a hotspot
     WiFi_manager.create_hotspot(hotspot_SSID, hotspot_password);
-
+    MDNS.begin(local_URL);
     bool LED_on = false;
     //Loop forever
     while(true){

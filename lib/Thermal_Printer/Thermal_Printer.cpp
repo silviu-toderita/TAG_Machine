@@ -218,7 +218,7 @@ void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount){
 	if(!suppressed){
 		wake();
 		//Write full-width bitmap
-		write_bytes(ASCII_DC2, '*', thickness, 48);
+		write_bytes(ASCII_DC2, 'V', thickness, 0);
 
 		//Write 48 bytes per line of black pixels
 		for(int i = 0;i<(48*thickness);i++){

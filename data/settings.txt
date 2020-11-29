@@ -52,13 +52,6 @@
     "req":true,
     "val":"tagmachine.local"},
 
-    {"id":"OTA_username",
-    "type":"text",
-    "name":"OTA Username*", 
-    "desc":"Over-The-Air Updates username.",
-    "req":true,
-    "val":"tagmachine"},
-
     {"id":"OTA_password",
     "type":"text",
     "name":"OTA Password", 
