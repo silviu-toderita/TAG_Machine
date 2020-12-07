@@ -33,7 +33,14 @@
     "name":"Send SMS Replies*",
     "desc":"Send SMS replies requesting a name for the phone book.",
     "req":true, 
+    "val":true},
+
+    {"id":"img_photos",
+    "type":"bool",
+    "name":"Print Photos",
+    "req":true, 
     "val":true}
+
     ],
 
 "advanced":[

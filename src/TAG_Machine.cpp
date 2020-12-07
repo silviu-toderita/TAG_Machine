@@ -440,18 +440,28 @@ void load_settings(){
     }else{
         send_replies = false;
     }
-
+    
+    //Load img_photos and check if value is true or false
+    String img_photos_string = web_interface.load_setting("img_photos");
+    bool img_photos;
+    if(img_photos_string == "trueselected"){
+        img_photos = true;
+    }else{
+        img_photos = false;
+    }
+    
     //Set up printer, WiFi Manager, and Twilio
-    printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt());
+    printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt(),img_photos);
     printer.set_printing_parameters(web_interface.load_setting("printer_heating_dots").toInt(),web_interface.load_setting("printer_heating_time").toInt(),web_interface.load_setting("printer_heating_interval").toInt());
     if(send_replies) twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"));
-
+    
     //Set up WiFi
     hotspot_SSID = web_interface.load_setting("hotspot_SSID");
     hotspot_password = web_interface.load_setting("hotspot_password");
     WiFi_manager.add_network(web_interface.load_setting("wifi_SSID_1"),web_interface.load_setting("wifi_password_1"));
     WiFi_manager.add_network(web_interface.load_setting("wifi_SSID_2"),web_interface.load_setting("wifi_password_2"));
     WiFi_manager.add_network(web_interface.load_setting("wifi_SSID_3"),web_interface.load_setting("wifi_password_3"));
+    
 }
 
 /*  offline: Take SPIFFS and printer offline ahead of restart, to avoid file system corruption and garbage printer output
@@ -466,11 +476,6 @@ void offline(){
 /*  init_basics: Initialize basic functions of the TAG Machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void init_basics(){
-    //Initialize the button and LED pins
-    pinMode(button_pin, INPUT_PULLUP);
-    pinMode(LED_pin, OUTPUT);
-    digitalWrite(LED_pin, LOW); 
-
     //Start the OTA updater using the device_password as the password
     ArduinoOTA.setHostname("tagmachine");
     ArduinoOTA.setPassword(OTA_password.c_str()); 
@@ -525,6 +530,8 @@ void bootloader(bool web_interface_on){
 void setup() {
     //Start the button to listen for bootloader mode
     pinMode(button_pin, INPUT_PULLUP);
+    pinMode(LED_pin, OUTPUT);
+    digitalWrite(LED_pin, LOW); 
     //If the button is held down, start the bootloader without the web interface running
     if(!digitalRead(button_pin)){
         bootloader(false);
@@ -538,6 +545,8 @@ void setup() {
     //Set the callback function for taking the printer offline before restarting due to settings update
     web_interface.set_callback(offline);
 
+    
+
     //If the settings are valid, load them
     if(settings_valid){
         load_settings();
@@ -548,6 +557,9 @@ void setup() {
         console("ERROR: Settings is missing one or more required values! Navigate to the Settings page and complete all required settings.");
         bootloader(true);
     }
+
+
+
 
     //Initialize the printer with the callback function for printing to the console
     printer.begin(console_callback);

@@ -22,7 +22,7 @@ static voidFuncPtrStr _print_callback; //Callback function when printing
 /*  Thermal_Printer constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Thermal_Printer::Thermal_Printer(){
-    config(9600, 13);
+    config(9600, 13, true);
 }
 
 /*  config
@@ -30,9 +30,10 @@ Thermal_Printer::Thermal_Printer(){
         as 115200 (default: 9600)
         DTR_pin_in: ESP8266 pin that DTR pin of printer is connected to (default: 13)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::config(uint32_t baud_rate_in, uint8_t DTR_pin_in){
+void Thermal_Printer::config(uint32_t baud_rate_in, uint8_t DTR_pin_in, bool img_web_in){
     baud_rate = baud_rate_in;
     DTR_pin = DTR_pin_in;
+    img_web = img_web_in;
 }
 
 /*	begin: Starts the printer, should be called during setup before printing.
@@ -41,18 +42,17 @@ void Thermal_Printer::config(uint32_t baud_rate_in, uint8_t DTR_pin_in){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::begin(voidFuncPtrStr print_callback){
 	//Begin the serial connection to the printer after a 150ms delay to allow for OTA update serial garbage to finish
-	delay(150);
+	delay(200);
 	Serial.begin(baud_rate);
 	Serial.set_tx(2); //Set the TX port to GPIO2
-	
-	//Wake the printer
-	delay(350); 
-	wake();
-	write_bytes(ASCII_ESC, '@'); // Initialize printer
 
+	//Wake the printer
+	delay(100); 
+	wake();
+    
 	//Set default printing parameters
 	set_printing_parameters(11, 120, 60);
-    write_bytes(ASCII_DC2, '#', (2 << 5) | 10);
+    write_bytes(ASCII_DC2, '#', (2 << 5) | 10); 
 
 	//Set DTR pin and enable printer flow control
 	pinMode(DTR_pin, INPUT_PULLUP);
@@ -92,26 +92,22 @@ void Thermal_Printer::offline(){
 	write_bytes(ASCII_ESC, '=', 0);
 }
 
-/*	suppress: Suppresses all printing, but still calls callback function when
-		printing. 
-		suppressed_in: Set suppressed status
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::suppress(bool suppressed_in){
-    suppressed = suppressed_in;
-}
-
 /*	feed: Advance the paper roll.
       	feed_amount: Amount of lines to advance the paper roll by. 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::feed(uint8_t feed_amount){
-    if(!suppressed){
-      	write_bytes(ASCII_ESC, 'd', feed_amount);
-    }
-    
-    //Print blank lines to the console
+    wake();
+    font_center(false);
+    font_inverse(false);
+    font_double_height(false);
+    font_double_width(false);
+    font_bold(false);
+
     for(int i = 0; i < feed_amount; i++){ 
-      	_print_callback(" ");
+        output(" ");
     }
+
+    sleep();
 }
 
 /*	print_status: print small text
@@ -202,7 +198,6 @@ void Thermal_Printer::print_error(String text, uint8_t feed_amount){
 	font_double_width(false);
 	font_bold(false);
 
-	suppressed = false;
 	output(wrap("ERROR: " + text, 32));
 	feed(feed_amount);
 	sleep();
@@ -215,19 +210,19 @@ void Thermal_Printer::print_error(String text, uint8_t feed_amount){
 void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount){
 	_print_callback("------------------------");
 
-	if(!suppressed){
-		wake();
-		//Write full-width bitmap
-		write_bytes(ASCII_DC2, 'V', thickness, 0);
+    wake();
+    //Write full-width bitmap
+    write_bytes(ASCII_GS, 'v', '0', 0, 48, 0);
+    write_bytes(thickness, 0);
 
-		//Write 48 bytes per line of black pixels
-		for(int i = 0;i<(48*thickness);i++){
-		write_bytes(255);
-		}
+    //Write 48 bytes per line of black pixels
+    for(int i = 0;i<(48*thickness);i++){
+    write_bytes(255);
+    }
 
-		feed(feed_amount);
-		sleep();
-	}
+    feed(feed_amount);
+    sleep();
+
 }
 
 /*	print_bitmap_file: Print a bitmap from a file
@@ -239,45 +234,37 @@ void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount){
         description: Text describing the photo to be sent back to printer callback
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount, String description){
-	
-    //Print the description to the callback
-	_print_callback(description);
 
-    //Only print if the printing has not been suppressed
-    if(!suppressed){
-        uint16_t height = file.read() * 256; //First byte is height * 256
-        height += file.read(); //Second byte is more height
-        wake();
-        //While there are still lines to print
-        while(height != 0){
-            //Print up to 255 lines per chunk
-            uint8_t chunk_height = 255;
-            //If there are less than 255 lines left, the chunk will be exactly the height remaining
-            if(height < 255){
+    uint16_t height = file.read() * 256; //First byte is height * 256
+    height += file.read(); //Second byte is more height
+    wake();
+    //While there are still lines to print
+    while(height != 0){
+        //Print up to 255 lines per chunk
+        uint8_t chunk_height = 255;
+        //If there are less than 255 lines left, the chunk will be exactly the height remaining
+        if(height < 255){
             chunk_height = height;
-            }
-
-            //Write full-width bitmap
-            write_bytes(ASCII_DC2, '*', chunk_height, 48);
-
-            //For each line, write the next 48 bytes
-            for(int i = 0; i < (chunk_height * 48); i++){
-            write_bytes(file.read());
-            }
-
-            //Height remaining = last height remaining - how much we printed this chunk
-            height = height - chunk_height;
-        }
-        feed(feed_amount);
-	    sleep();
-
-    }else{
-        //Print blank lines to the callback for each feed amount
-        for(int i = 0; i < feed_amount; i++){
-            _print_callback("");
         }
 
+        write_bytes(ASCII_GS, 'v', '0', 0, 48, 0);
+        write_bytes(chunk_height, 0);
+
+        //For each line, write the next 48 bytes
+        for(int i = 0; i < (chunk_height * 48); i++){
+        write_bytes(file.read());
+        }
+
+        //Height remaining = last height remaining - how much we printed this chunk
+        height = height - chunk_height;
     }
+
+    sleep();
+
+    //Print the description to the callback
+    _print_callback(description);
+
+    feed(feed_amount);
 
 }
 
@@ -289,80 +276,86 @@ void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount, String d
 		feed_amount: Amount to feed after image.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::print_bitmap_http(String URL, uint8_t feed_amount){
-	HTTPClient http; //Create a client object
+	wake();
+    
+    if(img_web){
+        HTTPClient http; //Create a client object
+        http.begin(URL); //Begin connection to address
 
-	http.begin(URL); //Begin connection to address
+        //Get HTTP code
+        int HTTP_code = http.GET();
+        //If there is any valid HTTP code...
+        if (HTTP_code > 0) {
 
-	//Get HTTP code
-	int HTTP_code = http.GET();
-	//If there is any valid HTTP code...
-	if (HTTP_code > 0) {
+            //If the HTTP code says there is a file found...
+            if (HTTP_code == HTTP_CODE_OK) {
 
-		//If the HTTP code says there is a file found...
-		if (HTTP_code == HTTP_CODE_OK) {
+                // Get TCP stream
+                WiFiClient * stream = http.getStreamPtr();
 
-            // Get TCP stream
-            WiFiClient * stream = http.getStreamPtr();
-
-            wake();
-
-            uint16_t height;
-            uint8_t byte_counter = 0;
-            while(byte_counter < 2){
-                //Wait for a byte to be available
-                while(!stream->available()) yield();
-                //The first byte is height * 256
-                if(byte_counter == 0){
-                height = stream->read() * 256;
-                byte_counter = 1;
-                //The second byte is additional height
-                }else{
-                height += stream->read();
-                byte_counter = 2;
+                uint16_t height;
+                uint8_t byte_counter = 0;
+                while(byte_counter < 2){
+                    //Wait for a byte to be available
+                    while(!stream->available()) yield();
+                    //The first byte is height * 256
+                    if(byte_counter == 0){
+                    height = stream->read() * 256;
+                    byte_counter = 1;
+                    //The second byte is additional height
+                    }else{
+                    height += stream->read();
+                    byte_counter = 2;
+                    }
+                    
                 }
-                
+
+                //While there are still lines to print
+                while(height != 0){
+                    //Print up to 255 lines per chunk
+                    uint8_t chunk_height = 255;
+                    //If there are less than 255 lines left, the chunk will be exactly the height remaining
+                    if(height < 255){
+                    chunk_height = height;
+                    }
+
+                    //Write full-width bitmap
+                    write_bytes(ASCII_GS, 'v', '0', 0, 48, 0);
+                    write_bytes(chunk_height, 0);
+
+                    //For each line, write the next 48 bytes
+                    for(int i = 0; i < (chunk_height * 48); i++){
+                    //Wait for a byte to be available
+                    while(!stream->available()) yield();
+                    //Write the byte
+                    write_bytes(stream->read());
+                    }
+                    //Height remaining = last height remaining - how much we printed this chunk
+                    height = height - chunk_height;
+                }
+
+            //If the HTTP status was anything other than 200 OK, print an error with the status
+            }else{
+                print_error("Image Download Failed with HTTP Status: " + String(HTTP_code), 0);
             }
+        //If there was no valid HTTP status, print an error
+        }else{
+            print_message("Image Download Failed", 0);
 
-            //While there are still lines to print
-            while(height != 0){
-                //Print up to 255 lines per chunk
-                uint8_t chunk_height = 255;
-                //If there are less than 255 lines left, the chunk will be exactly the height remaining
-                if(height < 255){
-                chunk_height = height;
-                }
-
-                //Write full-width bitmap
-                write_bytes(ASCII_DC2, '*', chunk_height, 48);
-
-                //For each line, write the next 48 bytes
-                for(int i = 0; i < (chunk_height * 48); i++){
-                //Wait for a byte to be available
-                while(!stream->available()) yield();
-                //Write the byte
-                write_bytes(stream->read());
-                }
-                //Height remaining = last height remaining - how much we printed this chunk
-                height = height - chunk_height;
-            }
-            _print_callback("<IMAGE>");
-
-        //If the HTTP status was anything other than 200 OK, print an error with the status
-		}else{
-            print_error("Image Download Failed with HTTP Status: " + String(HTTP_code), 0);
         }
-    //If there was no valid HTTP status, print an error
-	}else{
-        print_message("Image Download Failed", 0);
 
+        //Close the connection
+        http.end();
+
+        _print_callback("< IMAGE >");
+
+        feed(feed_amount);
+    }else{
+        print_message("< IMAGE >", feed_amount);
     }
 
-	feed(feed_amount);
-	sleep();
+    sleep();
 
-	//Close the connection
-	http.end();
-  
 }
 
 /*	(private) wake: Wake up the printer before printing.
@@ -437,10 +430,8 @@ void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, ui
       	text: Text to write.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::output(String text){ 
-    if(!suppressed){
-		wait();
-		Serial.println(text);
-    }
+	wait();
+	Serial.println(text);
     _print_callback(text);
 }
 

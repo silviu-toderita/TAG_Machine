@@ -17,11 +17,10 @@ class Thermal_Printer{
         Thermal_Printer();
 
         void    
-            config(uint32_t, uint8_t),
+            config(uint32_t, uint8_t, bool),
             begin(voidFuncPtrStr),
             begin(),
             set_printing_parameters(uint8_t, uint8_t, uint8_t),
-            suppress(bool),
             offline(),
             
             print_status(String, uint8_t),
@@ -62,6 +61,5 @@ class Thermal_Printer{
 
         uint8_t printMode = 0; //printMode byte holds inverse, double height, double width, and bold font status
         
-        bool suppressed = false; //When printer is suppressed, it won't print but callback will still be called
-
+        bool img_web; // Print images from web
 };

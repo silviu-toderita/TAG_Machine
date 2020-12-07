@@ -3,5 +3,5 @@
     "MQTT_broker_password": "",
     "www_root_folder": "",
     "webhook_URL": "",
-    "Twilio_auth_token": ""
+    "authorized_numbers":[]
 }
