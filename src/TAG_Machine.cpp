@@ -305,7 +305,7 @@ bool connect_to_MQTT(){
         //Attempt to connect to the MQTT server with clean-session turned off
         if(MQTT_client.connect("tag-machine",NULL,NULL,"fax",0,false,"disconnect",false)){
 
-            //If successful, subscribe to the topic for the phone number at a QoS of 1
+            //If successful, subscribe to the topic for the phone number at a QoS of 1 (!!! More security required)
             String topic = "smsin-" + phone_number;
             MQTT_client.subscribe(topic.c_str(),1);
 
