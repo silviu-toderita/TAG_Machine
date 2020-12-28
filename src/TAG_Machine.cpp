@@ -228,8 +228,10 @@ void process_message(String time, String from_number, String message, String med
 
     //Print a 4px line
     if(!photo_mode)printer.print_line(4, 4);
+    
 
 }
+
 
 /*  remove_emojis: Removes any UTF-8 characters from a string which are not US-ASCII (includes all emojis)
         input: String to process
@@ -575,6 +577,8 @@ void setup() {
     MQTT_client.setServer(bridge_URL.c_str(), 1883);
     //Set callback for incoming message from MQTT
     MQTT_client.setCallback(new_message);
+
+
     
     //Start the Wi-Fi
     begin_WiFi();
@@ -626,6 +630,7 @@ void loop() {
             } 
             break;
     }
+    
 }
 
     

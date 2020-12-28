@@ -27,6 +27,8 @@ var webhook_URL = config.webhook_URL;
 var Twilio_auth_token = config.Twilio_auth_token;
 var authorized_numbers = config.authorized_numbers;
 var emoji = require('node-emoji');
+var getUrls = require ('get-urls');
+var QRCode = require ('qrcode');
 
 //Initialize the storage object
 storage.init();
@@ -89,10 +91,15 @@ function bit_buffer(size){
         URL: URL of the image to download
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 function save_image(URL){
+    var dither_flag = false;
+    if(URL.indexOf("qr") == -1) dither_flag = true;
+
     //Wrap function in promise to only return once processing is done
     return new Promise(function(resolve, reject){
         //Read the image
         JIMP.read(URL, async (err, image) => {
+            if(err) throw err;
+
             //If the image is not a supported format, return "NS"
             if(!image){
                 resolve("NS");
@@ -116,9 +123,13 @@ function save_image(URL){
                 }
             }
     
+            var processed_image;
             //Dither the image, turning it into a 1-bit bitmap
-            var processed_image = dither(image.bitmap);
-    
+            if(dither_flag){
+                processed_image = dither(image.bitmap);
+            }else{
+                processed_image = image.bitmap;
+            }
             //Create new bit buffer with the size of the image plus 2 bytes for height information
             let buffer = new bit_buffer(size + 16);
             
@@ -214,25 +225,43 @@ app.post( '/', (req, res)  => {
     res.writeHead(200, {'Content-Type': 'text/xml'});
     res.end('<Response></Response>');
 
+    var image_num = parseInt(req.body.NumMedia);
+    var images = [
+        req.body.MediaUrl0,
+        req.body.MediaUrl1,
+        req.body.MediaUrl2,
+        req.body.MediaUrl3,
+        req.body.MediaUrl4,
+        req.body.MediaUrl5,
+        req.body.MediaUrl6,
+        req.body.MediaUrl7,
+        req.body.MediaUrl8,
+        req.body.MediaUrl9];
+
+    var URLs = Array.from(getUrls(req.body.Body));
+
+    for(var i = 0; i < URLs.length; i++){
+        var path = www_root_folder + "qr/" + i + ".png";
+        (async () => {
+            await QRCode.toFile(path,URLs[i]);
+            console.log("Generated QR Code...");
+            images[image_num] = path;
+            image_num++;
+        })()
+
+        while(images[image_num-1] === undefined){
+            require('deasync').runLoopOnce();
+        }
+    }
+    
     //Send a message to the MQTT broker, pass all relevant data from Twilio's webhook
     publish_MQTT_message({
         to: to_number,
         from: req.body.From.slice(1),
         id: req.body.MessageSid,
         body: req.body.Body,
-        image_count: parseInt(req.body.NumMedia),
-        media: [
-            req.body.MediaUrl0,
-            req.body.MediaUrl1,
-            req.body.MediaUrl2,
-            req.body.MediaUrl3,
-            req.body.MediaUrl4,
-            req.body.MediaUrl5,
-            req.body.MediaUrl6,
-            req.body.MediaUrl7,
-            req.body.MediaUrl8,
-            req.body.MediaUrl9
-        ],
+        image_count: image_num,
+        media: images,
         time: Math.floor(Date.now()/1000)
     });
         

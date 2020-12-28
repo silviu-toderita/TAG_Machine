@@ -30,6 +30,7 @@ class WiFi_Manager{
             handle();
 
         String 
-            get_SSID();
+            get_SSID(),
+            get_password();
 
 };

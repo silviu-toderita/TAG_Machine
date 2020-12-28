@@ -46,6 +46,8 @@ WiFi_Manager::WiFi_Manager(){
     disconnected_handler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected& event){
         if(status == WM_CONNECTED) status = WM_CONNECTION_LOST;
     });
+
+    WiFi.persistent(false);
 }
 
 /*  config
@@ -71,6 +73,7 @@ void WiFi_Manager::set_callbacks(void_function_pointer connected_callback, void_
 void connect(uint8_t ID){
     //Change status to WM_CONNECTING
     status = WM_CONNECTING;
+    WiFi.disconnect(true);
     //Attempt to connect to network
     if(password_list[ID] == ""){
         WiFi.begin(SSID_list[ID]);
@@ -200,6 +203,16 @@ wm_status WiFi_Manager::handle(){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String WiFi_Manager::get_SSID(){
   return WiFi.SSID();
+}
+
+/*  get_password: 
+    RETURNS password of current network
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+String WiFi_Manager::get_password(){
+  for (int i = 0; i < networks; i++){
+      if(SSID_list[i] == WiFi.SSID()) return password_list[i];
+  }
+  return "";
 }
 
 /*  add_network: Add Network to list of networks

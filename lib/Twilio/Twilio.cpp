@@ -47,7 +47,7 @@ bool Twilio::send_message(String to, String from, String message)
     WiFiClientSecure client;
     
     client.setInsecure();
-    client.setTimeout(5000);
+    client.setTimeout(2000);
     
     // Connect to Twilio's REST API
     if (!client.connect(host, httpsPort)) return false;
