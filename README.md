@@ -3,6 +3,7 @@
 
 A table-top device that can receive text (SMS) and picture (MMS) messages at its own phone number. Built around an ESP8266 (NodeMCU 1.0 or equivalent) microcontroller. Written in C++ using the Arduino framework. Under active development as of Jan 2021. 
 
+
 ## Features
 
 - Prints ASCII text received via SMS
@@ -14,6 +15,7 @@ A table-top device that can receive text (SMS) and picture (MMS) messages at its
 - Connects to chosen Wi-Fi Network(s) automatically
 - Generates its own Wi-Fi hotspot for initial setup
 - Uses a remote server to relay messages and convert images nearly instantly
+
 
 ## Setup Part 1 - Firmware
 
@@ -84,8 +86,6 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 - Thermal Printer wire colours can vary according to model, be sure to double-check label on the printer itself
 - Capacitor values do not have to be exact, but the voltage should be higher than your power supply
 - Resistor value will depend on the LED used. 470-1k Ohm should work for most LEDs
-- Be sure to leave the USB port on the NodeMCU exposed for initial programming
-- A combination LED button can be used and looks cleaner
 
 
 ## Setup Part 3 - Server
