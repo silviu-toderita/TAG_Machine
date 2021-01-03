@@ -78,6 +78,10 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 * Electrolytic Capacitor 220uF, 15v+
 * Case or Box (Simple DIY Case Design coming soon!)
 
+### Optional - Configure Printer
+
+You can optionally configure the printer to increase the Baud Rate form the defauly 9600 or 19200 to as high as 115200. This will increase photo printing speed significantly, although it will make no difference for text. [This configuration utility](http://www.dkia.at/downloads/csn-a2-t-tool.zip) (Windows only) works with some models of Thermal Printers, but not with others (your mileage may vary). 
+
 ### Connections Schematic:
 
 ![TAG Machine Schematic](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Schematic.png?raw=true)
@@ -86,7 +90,6 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 - Thermal Printer wire colours can vary according to model, be sure to double-check label on the printer itself
 - Capacitor values do not have to be exact, but the voltage should be higher than your power supply
 - Resistor value will depend on the LED used. 470-1k Ohm should work for most LEDs
-
 
 ## Setup Part 3 - Server
 
