@@ -23,9 +23,6 @@ var config = JSON.parse(fs.readFileSync('config.json'));
 var MQTT_broker_username = config.MQTT_broker_username;
 var MQTT_broker_password = config.MQTT_broker_password;
 var www_root_folder = config.www_root_folder;
-var webhook_URL = config.webhook_URL;
-var Twilio_auth_token = config.Twilio_auth_token;
-var authorized_numbers = config.authorized_numbers;
 var emoji = require('node-emoji');
 var getUrls = require ('get-urls');
 var QRCode = require ('qrcode');
@@ -210,17 +207,6 @@ async function publish_MQTT_message(data){
 app.post( '/', (req, res)  => {
     console.log(`Webhook received from Twilio...`);
 
-    var request_is_valid = false;
-    var to_number = req.body.To.slice(1);
-    for(var i = 0; i < authorized_numbers.length; i++){
-        if(authorized_numbers[i] == to_number) request_is_valid = true;
-    }
-
-    if(!request_is_valid){
-        console.log('Unauthorized Request!');
-        return res.status(401).send('Unauthorized');
-    }
-
     //Respond to Twilio with a message to acknowledge receipt
     res.writeHead(200, {'Content-Type': 'text/xml'});
     res.end('<Response></Response>');
@@ -256,7 +242,7 @@ app.post( '/', (req, res)  => {
     
     //Send a message to the MQTT broker, pass all relevant data from Twilio's webhook
     publish_MQTT_message({
-        to: to_number,
+        to: req.body.To.slice(1),
         from: req.body.From.slice(1),
         id: req.body.MessageSid,
         body: req.body.Body,

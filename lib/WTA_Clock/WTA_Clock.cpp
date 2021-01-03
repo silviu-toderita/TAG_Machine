@@ -13,8 +13,6 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 #include "WTA_Clock.h"
-#include "ESP8266WiFi.h" //WiFi Library for hostname resolution
-#include "WiFiClient.h" //Web Client Library
 
 /*  WTA_Clock Constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/

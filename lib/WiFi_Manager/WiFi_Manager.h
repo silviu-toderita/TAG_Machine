@@ -1,3 +1,6 @@
+#include "Arduino.h"
+#include "ESP8266WiFi.h" //WiFi Library
+
 //wm_status type for holding WiFi Manager status
 typedef enum {
     WM_IDLE                 = 0,

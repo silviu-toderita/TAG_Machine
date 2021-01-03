@@ -13,7 +13,6 @@
     silviutoderita.com
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#include "ESP8266WiFi.h" //WiFi Library"
 #include "WiFi_Manager.h"
 
 String SSID_list[32]; //WiFi Network Name

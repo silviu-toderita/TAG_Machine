@@ -6,7 +6,6 @@
     silviu.toderita@gmail.com
     silviutoderita.com
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-//Emoji Support!
 
 #include "Arduino.h" //Arduino Library
 #include "Persistent_Storage.h" //Silviu's persistent storage library
@@ -34,8 +33,8 @@ PubSubClient MQTT_client(ESP_client); //MQTT client object
 Twilio twilio; //Twilio object
 Thermal_Printer printer; //Printer object
 
-String last_message_ID; //Twilio ID of the last message received
 
+String last_message_ID; //Twilio ID of the last message received
 bool MQTT_connected = false; //Holds status of MQTT connection, true if MQTT has connected after Wi-Fi connection
 bool WiFi_connection_failed = false; //True if the Wi-Fi Connection has failed once, false if it has not failed since last successful connect
 
@@ -45,12 +44,10 @@ String owner_name; //Name of device owner
 String bridge_URL; //URL of the MQTT broker
 
 bool send_replies = true; //SMS replies are on/off default
-
 String local_URL = "tagmachine"; //Local URL to access web interface and OTA updates default
 String hotspot_SSID = "tagmachine"; //Hotspot SSID default
 String hotspot_password = "12345678"; //Hotspot Password default
 String OTA_password = "12345678"; //OTA password default
-
 uint8_t LED_pin = 4; //ESP pin for LED default
 uint8_t button_pin = 5; //ESP pin for button default
 
@@ -118,7 +115,7 @@ String format_NA_phone_numbers(String input){
         media: Media files (if any), separated by ","
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void process_message(String time, String from_number, String message, String media){
-    //If the message is ".photo", change photo_mode to true so that the photo is printed by itself
+    //If the message is "_photo", change photo_mode to true so that the photo is printed by itself
     bool photo_mode = false;
     if(message == "_photo"){
         photo_mode = true;

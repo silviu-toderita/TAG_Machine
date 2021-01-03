@@ -14,6 +14,8 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 #include "Arduino.h"
+#include "ESP8266WiFi.h" //WiFi Library for hostname resolution
+#include "WiFiClient.h" //Web Client Library
 
 class WTA_Clock{
     public:
