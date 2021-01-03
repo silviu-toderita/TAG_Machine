@@ -17,7 +17,7 @@ A table-top device that can receive text (SMS) and picture (MMS) messages at its
 
 ## Setup Part 1 - Firmware
 
-*NOTE: Before uploading the firmware to the NodeMCU, ensure it's plugged into your computer via USB, and that it's not connected to the power supply or the printer. *
+*NOTE: Before uploading the firmware to the NodeMCU, ensure it's plugged into your computer via USB, and that it's not connected to the power supply or the printer.*
 
 ### Install Drivers
 
