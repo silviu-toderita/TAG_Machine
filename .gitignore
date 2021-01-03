@@ -1,5 +1,5 @@
 .DS_Store
-Resources/
+/Resources/
 TAG_Machine.code-workspace
-.pio/build/
-.vscode/
+/.pio/build/
+/.vscode/
