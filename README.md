@@ -73,7 +73,7 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 * Power Supply 5-8v, 1A+ (8v 3A recommended) 
   * *Note that while both the NodeMCU and Thermal Printer support input voltages up to 9v, some models of printers are extremely sensitive to voltages slightly above 9.0v. Power Supplies with outputs of 9v may drift above 9v at times, causing the printer to freeze.*
 * DC Jack
-* Capacitor 220uF, 15v+
+* Electrolytic Capacitor 220uF, 15v+
 * Case or Box (Simple DIY Case Design coming soon!)
 
 ### Connections Schematic:
