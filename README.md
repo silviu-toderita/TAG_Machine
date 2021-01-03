@@ -7,8 +7,8 @@ A table-top device that can receive text (SMS) and picture (MMS) messages at its
 
 - Prints ASCII text received via SMS
 - Prints dithered black and white images received via MMS
-- Prints text description of emojis (this model of printer does not support text inline with images)
-- Detects links and generates QR Code automatically
+- Prints text description of received emojis
+- Detects links and generates QR Codes for them automatically
 - Automatically responds to new phone numbers to request a name for the address book
 - Web interface for changing settings available on local network (mobile-friendly too!)
 - Connects to chosen Wi-Fi Network(s) automatically
