@@ -15,6 +15,30 @@ A table-top device that can receive text (SMS) and picture (MMS) messages at its
 - Generates its own Wi-Fi hotspot for initial setup
 - Uses a remote server to relay messages and convert images nearly instantly
 
+## Getting Started (Hardware)
+
+### Shopping List
+* [NodeMCU 1.0 or equivalent](https://www.aliexpress.com/wholesale?catId=0&initiative_id=SB_20200607165641&SearchText=nodemcu) (ESP8266 module with 4mb of flash memory).
+* [AdaFruit Mini Thermal Printer](https://www.adafruit.com/product/597), [Sparkfun Thermal Printer](https://www.sparkfun.com/products/14970), or [equivalent](https://www.aliexpress.com/item/4000670706301.html?spm=a2g0o.productlist.0.0.6f64c49bIuD0cf&algo_pvid=21e71930-b292-4d6e-b394-f049cdb62eff&algo_expid=21e71930-b292-4d6e-b394-f049cdb62eff-9&btsid=0ab50f6115915778964662640e4af4&ws_ab_test=searchweb0_0,searchweb201602_,searchweb201603_).
+* LED & current-limiting resistor
+* Momentary push button
+* Power Supply 5-8v, 1A+ (8v 3A recommended)
+* DC Jack
+* Capacitor 220uF, 15v+
+* Case or Box (Simple DIY Case Design coming soon!)
+
+### Connections Schematic:
+
+![TAG Machine Schematic](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Schematic.png?raw=true)
+
+### Connections Notes:
+- Thermal Printer wire colours can vary according to model, be sure to double-check label on the printer itself.
+- Capacitor values do not have to be exact, but the voltage should be higher than your power supply
+- Resistor value will depend on the LED used. 470-1k Ohm should work for most LEDs
+- Be sure to leave the USB port on the NodeMCU exposed for initial programming
+- A combination LED button can be used and looks cleaner
+
+
 ## Getting Started (Software)
 
 Download the data, lib and src folders to your computer and compile them using the [Arduino IDE](https://www.arduino.cc/en/Main/Software) or a compatible IDE such as [Visual Studio Code](https://code.visualstudio.com/) with the [PlatformIO](https://platformio.org/) Extension. Configure your IDE for the ESP8266 board with at least 2MB of flash memory and upload the code to your board.  
@@ -23,15 +47,9 @@ Upload the files in the server folder to a server that you control. Edit the con
 
 Create a Twilio account and get a phone number. Point Twilio to your server webhook. 
 
-## Getting Started (Hardware)
 
-* [NodeMCU 1.0 or equivalent](https://www.aliexpress.com/wholesale?catId=0&initiative_id=SB_20200607165641&SearchText=nodemcu) (ESP8266 module with 4mb of flash memory).
-* [AdaFruit Mini Thermal Printer](https://www.adafruit.com/product/597), [Sparkfun Thermal Printer](https://www.sparkfun.com/products/14970), or [equivalent](https://www.aliexpress.com/item/4000670706301.html?spm=a2g0o.productlist.0.0.6f64c49bIuD0cf&algo_pvid=21e71930-b292-4d6e-b394-f049cdb62eff&algo_expid=21e71930-b292-4d6e-b394-f049cdb62eff-9&btsid=0ab50f6115915778964662640e4af4&ws_ab_test=searchweb0_0,searchweb201602_,searchweb201603_).
-* LED & current-limiting resistor
-* Momentary push button
-* 9v 3A Power Supply
 
-![TAG Machine Schematic](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Schematic.png?raw=true)
+
 
 ## Authors
 
