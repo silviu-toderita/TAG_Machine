@@ -51,6 +51,8 @@ String OTA_password = "12345678"; //OTA password default
 uint8_t LED_pin = 4; //ESP pin for LED default
 uint8_t button_pin = 5; //ESP pin for button default
 
+bool LED_on = false;
+
 
 /*  console_print: Print to the web console
         input: Text to print
@@ -501,17 +503,28 @@ void bootloader(bool web_interface_on){
     //Create a hotspot
     WiFi_manager.create_hotspot(hotspot_SSID, hotspot_password);
     MDNS.begin(local_URL);
-    bool LED_on = false;
     //Loop forever
     while(true){
-        //Flash the LED 4 times a second
-        if(LED_on && millis() % 250 < 125){
-            digitalWrite(LED_pin, HIGH);
-            LED_on = false;
-        }else if(!LED_on && millis() % 250 >= 125){
-            digitalWrite(LED_pin, LOW);
-            LED_on = true;
+        if(web_interface_on){
+            //Flash the LED once a second
+            if(LED_on && millis() % 1000 < 500){
+                digitalWrite(LED_pin, HIGH);
+                LED_on = false;
+            }else if(!LED_on && millis() % 1000 >= 500){
+                digitalWrite(LED_pin, LOW);
+                LED_on = true;
+            }
+        }else{
+            //Flash the LED 4 times a second
+            if(LED_on && millis() % 250 < 125){
+                digitalWrite(LED_pin, HIGH);
+                LED_on = false;
+            }else if(!LED_on && millis() % 250 >= 125){
+                digitalWrite(LED_pin, LOW);
+                LED_on = true;
+            }
         }
+
 
         //Run multicast DNS 
         MDNS.update();

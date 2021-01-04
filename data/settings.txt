@@ -84,7 +84,7 @@
     {"id":"printer_heating_interval",
     "type":"num",
     "name":"Printer Heating Interval*", 
-    "desc":"Printer Heating Interval;Amount of time between heating each line in 10us increments (0-255). Higher = Clearer print, but slower print speed.",
+    "desc":"Amount of time between heating each line in 10us increments (0-255). Higher = Clearer print, but slower print speed.",
     "req":true,
     "val":60},
 
