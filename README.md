@@ -120,12 +120,25 @@ This allows external connections to subscribe anonymously.
 
 5. Run the following command: "sudo service mosquitto restart"
 
-6. ... to be continued
+6. Enable port-forwarding for port 1883. 
 
-Upload the files in the server folder to a server that you control. Edit the config.json with your own settings, and then run TAG_Bridge.js using node. Install an MQTT Broker such as [Mosquitto](https://mosquitto.org/) on the same server and run it. 
+7. Install your prefered web server (ie. Apache) and enable port forwarding for HTTP/HTTPS.
+
+8. Install [Node.js](https://nodejs.org/en/)
+
+9. Upload the contents of the server folder from this repo to your server. 
+
+10. Edit config.json and add the MQTT broker username and password that you created earlier, and the root directory of your web server. 
+
+11. Run TAG_Bridge.js using node, preferably using a process manager such as pm2 to ensure it restarts upon reboot. 
+
+## Setup Part 4 - Twilio
 
 Create a Twilio account and get a phone number. Point Twilio to your server webhook. 
 
+## Setup Part 5 - TAG Machine Settings
+
+...
 
 ## Authors
 
