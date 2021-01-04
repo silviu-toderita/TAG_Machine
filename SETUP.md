@@ -117,7 +117,7 @@ This allows external connections to subscribe anonymously.
 
 ## Part 4 - Twilio
 
-1. Create a [Twilio] account. New users can sign up for a trial without a credit card, which will give you a small amount of funds in your account for sending and receiving SMS and MMS messages. Sending messages is limited to verified numbers only, so it's recommended that you turn off "Send SMS Replies" in the TAG Machine settings later if you're planning on using a trial account. 
+1. Create a [Twilio](https://www.twilio.com/) account. New users can sign up for a trial without a credit card, which will give you a small amount of funds in your account for sending and receiving SMS and MMS messages. Sending messages is limited to verified numbers only, so it's recommended that you turn off "Send SMS Replies" in the TAG Machine settings later if you're planning on using a trial account. 
 
 2. [Choose a phone-number and "buy" it](https://support.twilio.com/hc/en-us/articles/223135247-How-to-Search-for-and-Buy-a-Twilio-Phone-Number-from-Console) using either your trial funds or real money you have added to your account. 
 
