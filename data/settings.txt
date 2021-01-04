@@ -26,7 +26,8 @@
     "type":"text",
     "name":"Bridge URL*",
     "desc":"The URL of the Twilio-MQTT bridge used to relay messages.",
-    "req":true},
+    "req":true,
+    "val":"silviutoderita.com"},
 
     {"id":"send_replies",
     "type":"bool",
