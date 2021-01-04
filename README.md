@@ -24,9 +24,9 @@ There is a [full setup guide](https://github.com/silviu-toderita/TAG_Machine/blo
 
 ## Dependencies
 
-	* [knolleary/PubSubClient](https://github.com/knolleary/pubsubclient) 2.8
-	* [bblanchon/ArduinoJson](https://github.com/bblanchon/ArduinoJson) 6.17.2
-	* [links2004/WebSockets](https://github.com/Links2004/arduinoWebSockets) 2.3.2
+* [knolleary/PubSubClient](https://github.com/knolleary/pubsubclient) 2.8
+* [bblanchon/ArduinoJson](https://github.com/bblanchon/ArduinoJson) 6.17.2
+* [links2004/WebSockets](https://github.com/Links2004/arduinoWebSockets) 2.3.2
 
 ## Using the TAG Machine
 
