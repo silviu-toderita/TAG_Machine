@@ -95,7 +95,7 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 
 ### Option 1: Use Silviu's Server (Easy)
 
-For this option, there is no setup required. When entering your TAG Machine settings later, use "silviutoderita.com" as the Bridge URL. When setting up Twilio later, use "https://silviutoderita.com/twilio/" as the Webhook address and "HTTP POST" as the request method.
+For this option, there is no setup required. When entering your TAG Machine settings later, use the default Bridge URL. When setting up Twilio later, use "https://silviutoderita.com/twilio/" as the Webhook address and "HTTP POST" as the request method.
 
 ### Option 2: Set Up Your Own Server (Advanced)
 
@@ -122,7 +122,7 @@ This allows external connections to subscribe anonymously.
 
 6. Enable port-forwarding for port 1883. 
 
-7. Install your prefered web server (ie. Apache) and enable port forwarding for HTTP/HTTPS.
+7. Install your prefered web server (ie. [Apache](https://httpd.apache.org/)) and enable port forwarding for HTTP/HTTPS.
 
 8. Install [Node.js](https://nodejs.org/en/)
 
@@ -134,11 +134,25 @@ This allows external connections to subscribe anonymously.
 
 ## Setup Part 4 - Twilio
 
-Create a Twilio account and get a phone number. Point Twilio to your server webhook. 
+1. Create a [Twilio] account. New users can sign up for a trial without a credit card, which will give you a small amount of funds in your account for sending and receiving SMS and MMS messages. Sending messages is limited to verified numbers only, so it's recommended that you turn off "Send SMS Replies" in the TAG Machine settings later if you're planning on using a trial account. 
+
+2. [Choose a phone-number and "buy" it](https://support.twilio.com/hc/en-us/articles/223135247-How-to-Search-for-and-Buy-a-Twilio-Phone-Number-from-Console) using either your trial funds or real money you have added to your account. 
+
+3. Navigate to the [Phone Numbers page](https://www.twilio.com/console/phone-numbers/incoming) of your [Twilio Console](https://www.twilio.com/console/), click on your number and scroll down to the "Messaging" section. Under "Configure With", select "Webhooks, TwiML Bins, Functions, Studio, or Proxy" from the dropdown box.
+
+![Twilio Screenshot](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Twilio_Settings.png?raw=true)
+
+4. Under "A Message Comes In", select "Webhook" from the dropdown box. Next to that, type in "https://silviutoderita.com/twilio/" if using Silviu's server, or "http://youraddress.com/twilio" if using your own server. Next to that, make sure "HTTP Post" is selected as the request method. Press the "Save" button at the bottom when done. 
 
 ## Setup Part 5 - TAG Machine Settings
 
-...
+1. Plug in your TAG Machine. The LED should start blinking rapidly almost immediately. This indicates that an incomplete settings file was detected, and it has automatically entered hotspot mode. 
+
+2. Connect your computer or phone to the Wi-Fi network "tagmachine" with default password "12345678". 
+
+3. Navigate to [http://tagmachine.local](http://tagmachine.local). Note that some Android devices may lack support for .local domains, it is recommended you use a different device if the page cannot load on your Android device. 
+
+4. In order to get the Tag Machine to start, the following settings are required and incomplete initially: Phone Number, Twilio Account SID, Twilio Auth Token, WiFi Network Name 1, Wifi Network Password 1. Please read the Manual for help with the Settings page. 
 
 ## Authors
 
