@@ -449,9 +449,14 @@ void load_settings(){
         img_photos = false;
     }
     
-    //Set up printer, WiFi Manager, and Twilio
+    //Set up printer and WiFi Manager
     printer.config(web_interface.load_setting("printer_baud").toInt(), web_interface.load_setting("printer_DTR_pin").toInt(),img_photos);
     printer.set_printing_parameters(web_interface.load_setting("printer_heating_dots").toInt(),web_interface.load_setting("printer_heating_time").toInt(),web_interface.load_setting("printer_heating_interval").toInt());
+
+    //Set up Twilio
+    String twilio_SID = web_interface.load_setting("Twilio_account_SID");
+    String twilio_auth = web_interface.load_setting("Twilio_auth_token");
+    if(twilio_SID == "" || twilio_auth == "") send_replies = false;
     if(send_replies) twilio.config(web_interface.load_setting("Twilio_account_SID"), web_interface.load_setting("Twilio_auth_token"));
     
     //Set up WiFi

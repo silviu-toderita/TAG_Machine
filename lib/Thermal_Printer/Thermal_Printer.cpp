@@ -49,6 +49,7 @@ void Thermal_Printer::begin(voidFuncPtrStr print_callback){
 	//Wake the printer
 	delay(100); 
 	wake();
+    write_bytes(ASCII_ESC, '@');
     
 	//Set default printing parameters
 	set_printing_parameters(11, 120, 60);

@@ -12,15 +12,15 @@
 
     {"id":"Twilio_account_SID",
     "type":"text",
-    "name":"Twilio Account SID*",
-    "desc":"The SID for your Twilio account. Get this from your Twilio dashboard.",
-    "req":true},
+    "name":"Twilio Account SID",
+    "desc":"The SID for your Twilio account. Required for SMS replies only.",
+    "req":false},
 
     {"id":"Twilio_auth_token",
     "type":"text",
-    "name":"Twilio Auth Token*",
-    "desc":"The Auth Token for your Twilio account. Get this from your Twilio dashboard.",
-    "req":true},
+    "name":"Twilio Auth Token",
+    "desc":"The Auth Token for your Twilio account. Required for SMS replies only.",
+    "req":false},
 
     {"id":"bridge_URL",
     "type":"text",
@@ -38,7 +38,7 @@
 
     {"id":"img_photos",
     "type":"bool",
-    "name":"Print Photos",
+    "name":"Print Photos*",
     "req":true, 
     "val":true}
 
