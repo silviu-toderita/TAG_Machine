@@ -95,7 +95,7 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 
 ### Option 1: Use Silviu's Server (Easy)
 
-For this option, there is no setup required. When entering your TAG Machine settings later, use "silviutoderita.com" as the Bridge URL. When setting up Twilio later, use "https://silviutoderita.com/twilio/" as the Webhook address and "HTTP POST" as the request method.
+For this option, there is no setup required. When entering your TAG Machine settings later, use the default Bridge URL. When setting up Twilio later, use "https://silviutoderita.com/twilio/" as the Webhook address and "HTTP POST" as the request method.
 
 ### Option 2: Set Up Your Own Server (Advanced)
 
