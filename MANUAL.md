@@ -8,8 +8,8 @@ Follow the [setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/mas
 
 The TAG (Text and Graphics) Machine is a table-top device that prints messages received on thermal receipt paper. The TAG Machine has its own phone number, and can accept these kinds of messages:
 - SMS (Text Messages)
-  - Emojis are automatically converted to a text description
-  - URLs are automatically converted to a QR code
+  - Emojis are automatically converted to text descriptions
+  - URLs are automatically converted to QR codes
 - MMS (Picture Messages)
   - Supports common image formats such as JPG, GIF and PNG
   - Images are automatically dithered and scaled down to a maximum width of 384 pixels
@@ -29,7 +29,23 @@ This mode is indicated by a rapidly flashing LED. To enter this mode, hold the b
 Wi-Fi Name: tagmachine
 Wi-Fi Password: 12345678
 
+### Message Mode
+The default mode, indicated by a printout of the TAG MACHINE logo, the wi-fi network it has connected to, the web console URL, the date and time, and the current phone number. 
 
+![TAG Machine Example](https://raw.githubusercontent.com/silviu-toderita/TAG_Machine/master/docs/tag_printout.jpg)
+
+In this mode, the LED is off. You can receive messages at the phone number, and they should be printed. If the LED is off but nothing prints or an error message prints, see the Error Messages section.
+
+### Hotspot Mode
+If the TAG Machine starts up in Message Mode and a known Wi-Fi network is not found, it will give you the option of entering hotspot mode by pressing a button. If you choose to enter this mode, the hotspot network name and password you have chosen will be printed out again as a reminder and a hotspot will be created. You can then connect to the hotspot and navigate to the URL of the web interface to update Wi-Fi Network details or any other settings. 
+
+## Using the TAG Machine
+
+...
+
+## Error Messages
+
+...
 
 ## Settings
 
