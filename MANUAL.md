@@ -4,6 +4,26 @@
 
 Follow the [setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md). Once finished [Part 5](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-5---tag-machine-settings), you should be on the settings page of the Tag Machine web interface. 
 
+## General Operation
+
+The TAG (Text and Graphics) Machine is a table-top device that prints messages received on thermal receipt paper. The TAG Machine has its own phone number, and can accept these kinds of messages:
+- SMS (Text Messages)
+  - Emojis are automatically converted to a text description
+  - URLs are automatically converted to a QR code
+- MMS (Picture Messages)
+  - Supports common image formats such as JPG, GIF and PNG
+  - Images are automatically dithered and scaled down to a maximum width of 384 pixels
+  
+The TAG Machine connects to your local Wi-Fi network to access the internet, and establishes a connection with a relay server (by default, Silviu's server, though you can set up your own). This server receives messages from Twilio, which is the phone provider we will be using. The TAG Machine can optionally reply to senders by communicating directly with Twilio, in order to request names for the contacts list. 
+
+## Modes of Operation
+
+### Setup Mode
+This mode is indicated by a slowly flashing LED. This mode indicates that there is an error or missing field in the settings file and the TAG Machine cannot start. This is the expected mode when the TAG Machine is turned on for the first time. A hotspot is enabled:
+Wi-Fi Name: tagmachine
+Wi-Fi Password: 12345678
+The web interface is enabled to allow initial setup. Go to http://tagmachine.local from a browser. Navigate to the [settings page]() to enter initial settings or correct errors. 
+
 ## Settings
 
 ### General Settings
