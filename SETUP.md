@@ -135,4 +135,4 @@ This allows external connections to subscribe anonymously.
 
 3. Navigate to [http://tagmachine.local](http://tagmachine.local). Note that some Android devices may lack support for .local domains, it is recommended you use a different device if the page cannot load on your Android device. 
 
-4. In order to get the Tag Machine to start, the following settings are required at a minimum (though you may want to change some defaults also): Phone Number, WiFi Network Name 1, Wifi Network Password 1. Please read the [Manual](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md) for help with the Settings page. 
+4. In order to get the Tag Machine to start, the following settings are required at a minimum (though you may want to change some defaults also): Phone Number, WiFi Network Name 1. Please read the [Manual](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md) for help with the Settings page. 
