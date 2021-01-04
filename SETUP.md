@@ -60,6 +60,7 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 * DC Jack
 * Electrolytic Capacitor 220uF, 15v+
 * Case or Box (Simple DIY Case Design coming soon!)
+* Thermal Receipt Paper - 58mm wide, max thickness 40mm
 
 ### Optional - Configure Printer
 
