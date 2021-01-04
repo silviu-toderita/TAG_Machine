@@ -93,6 +93,35 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 
 ## Setup Part 3 - Server
 
+### Option 1: Use Silviu's Server (Easy)
+
+For this option, there is no setup required. When entering your TAG Machine settings later, use "silviutoderita.com" as the Bridge URL. When setting up Twilio later, use "https://silviutoderita.com/twilio/" as the Webhook address and "HTTP POST" as the request method.
+
+### Option 2: Set Up Your Own Server (Advanced)
+
+1. Install the [Mosquitto MQTT Broker](https://mosquitto.org/) on your server.
+
+2. Create a new file called acl_file.conf and add it to /etc/mosquitto/ or wherever the configuration settings for Mosquitto are stored on your OS. Add the following lines:
+
+> topic read #
+> user USERNAME
+> pattern readwrite #
+
+Replace USERNAME with any desired MQTT broker username. Write down this username for later. These settings allow any user to subscribe to the broker, and only a particular user to publish and subscribe. 
+
+3. In this same directory, run the command "sudo mosquitto_passwd -c passwd USERNAME" without the quotes and replace USERNAME with your MQTT broker username. It will then ask you to set a password. Write down this password for later. 
+
+4. In this same directory, edit the file mosquitto.conf and add the following lines:
+
+> listener 1883
+> allow_anonymous true
+
+This allows external connections to subscribe anonymously. 
+
+5. Run the following command: "sudo service mosquitto restart"
+
+6. ... to be continued
+
 Upload the files in the server folder to a server that you control. Edit the config.json with your own settings, and then run TAG_Bridge.js using node. Install an MQTT Broker such as [Mosquitto](https://mosquitto.org/) on the same server and run it. 
 
 Create a Twilio account and get a phone number. Point Twilio to your server webhook. 
