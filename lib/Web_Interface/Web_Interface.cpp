@@ -478,6 +478,18 @@ void Web_Interface::set_callback(void_function_pointer offline){
     RETURNS true if there is no blank parameter that's required, false if there is a blank parameter that's required
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 bool check_settings_file(){
+
+    // If the settings file does not exist, copy it from the default settings file
+    if(!SPIFFS.exists(settings_path)){
+        File settings_def = SPIFFS.open("/settings_def.txt", "r");
+        File settings = SPIFFS.open(settings_path, "w");
+        while(settings_def.available()){
+            settings.write(settings_def.read());
+        }
+        settings_def.close();
+        settings.close();
+    }
+
     //Open the file
     File file = SPIFFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document

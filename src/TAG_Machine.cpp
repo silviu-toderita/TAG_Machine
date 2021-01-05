@@ -354,7 +354,8 @@ void connection_failed(){
     if(!WiFi_connection_failed){
         //Print an error and record that the connection has failed
         printer.print_error("Unable to Connect To Network! Check WiFi Password.", 0); 
-        printer.print_status("Attempting to Connect...", 2);
+        printer.print_status("Attempting to Connect...", 1);
+        printer.print_heading("<-- Press Button to Start Hotspot", 3);
         WiFi_connection_failed = true;
     }
     
@@ -498,6 +499,8 @@ void init_basics(){
         web_interface_on: Specifies if the web interface should be on to see the console and update settings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void bootloader(bool web_interface_on){
+    uint16_t button_time = millis();
+    bool button_pressed = true;
     //Initialize basic functions
     init_basics();
     //Create a hotspot
@@ -525,6 +528,14 @@ void bootloader(bool web_interface_on){
             }
         }
 
+        // If the button continues to be held for 5 seconds continuously, do a factory reset
+        if(button_pressed && digitalRead(button_pin)) button_pressed = false;
+        if(button_pressed && millis() > button_time + 5000){
+            SPIFFS.remove("/settings.txt");
+            SPIFFS.remove("/contacts.txt");
+            offline();
+            ESP.restart();
+        }
 
         //Run multicast DNS 
         MDNS.update();
