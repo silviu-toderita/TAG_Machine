@@ -2,7 +2,7 @@
 
 ## Initial Setup
 
-Follow the [setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md). Once finished [Part 5](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-5---tag-machine-settings), you should be on the settings page of the Tag Machine web interface. 
+Follow the [setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md). Once finished [Part 5](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-5---tag-machine-settings), you should be on the settings page of the Tag Machine web interface. Read the [settings section](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) for more information on how to complete setup. 
 
 ## General Operation
 
@@ -14,7 +14,7 @@ The TAG (Text and Graphics) Machine is a table-top device that prints messages r
   - Supports common image formats such as JPG, GIF and PNG
   - Images are automatically dithered and scaled down to a maximum width of 384 pixels
   
-The TAG Machine connects to your local Wi-Fi network to access the internet, and establishes a connection with a relay server (by default, Silviu's server, though you can set up your own). This server receives messages from Twilio, which is the phone provider we will be using. The TAG Machine can optionally reply to senders by communicating directly with Twilio, in order to request names for the contacts list. 
+The TAG Machine connects to your local Wi-Fi network to access the internet, and establishes a connection with a relay server (by default, Silviu's server, though [you can set up your own](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#option-2-set-up-your-own-server-advanced)). This server receives messages from [Twilio](https://www.twilio.com/), which is the phone provider we will be using. The TAG Machine can optionally reply to senders by communicating directly with Twilio, in order to request names for the contacts list. 
 
 ## Modes of Operation
 
@@ -23,7 +23,7 @@ This mode is indicated by a slowly flashing LED. This mode indicates that there 
 - Wi-Fi Name: tagmachine
 - Wi-Fi Password: 12345678
 
-The web interface is enabled to allow initial setup. Go to http://tagmachine.local from a browser. Navigate to the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) to enter initial settings or correct errors. 
+The [Web Interface](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#web-interface) is enabled to allow initial setup. Go to http://tagmachine.local from a browser. Navigate to the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) to enter initial settings or correct errors. 
 
 ### Recovery Mode
 This mode is indicated by a rapidly flashing LED. To enter this mode, hold the button while plugging in the TAG Machine. This mode only allows for over-the-air firmware updates with the password "123456778". A hotspot is enabled:
@@ -31,14 +31,14 @@ This mode is indicated by a rapidly flashing LED. To enter this mode, hold the b
 - Wi-Fi Password: 12345678
 
 ### Message Mode
-The default mode, indicated by a printout of the TAG MACHINE logo, the wi-fi network it has connected to, the web console URL, the date and time, and the current phone number. 
+The default mode, indicated by a printout of the TAG MACHINE logo, the wi-fi network it has connected to, the web interface URL, the date and time, and the current phone number. 
 
 ![TAG Machine Example](https://raw.githubusercontent.com/silviu-toderita/TAG_Machine/master/docs/tag_printout.jpg)
 
-In this mode, the LED is off. You can receive messages at the phone number, and they should be printed. If the LED is off but nothing prints or an error message prints, see the Error Messages section.
+In this mode, the LED is off. You can receive messages at the phone number, and they should print automaticalls. If the LED is off but nothing prints or an error message prints, see the Error Messages section.
 
 ### Hotspot Mode
-If the TAG Machine starts up in Message Mode and a known Wi-Fi network is not found, it will give you the option of entering hotspot mode by pressing a button. If you choose to enter this mode, the hotspot network name and password you have chosen will be printed out again as a reminder and a hotspot will be created. You can then connect to the hotspot and navigate to the URL of the web interface to update Wi-Fi Network details or any other settings. Press the button again at any time to return to Message Mode.
+If the TAG Machine starts up in Message Mode and a known Wi-Fi network is not found, it will give you the option of entering hotspot mode by pressing a button. If you choose to enter this mode, the hotspot network name and password you have chosen will be printed out again as a reminder, and a hotspot will be created. You can then connect to the hotspot and navigate to the URL of the web interface to update Wi-Fi Network details or any other settings. Press the button again at any time to return to Message Mode.
 
 ## Using the TAG Machine
 
@@ -51,11 +51,11 @@ ASCII text is supported. Emojis that have an available text description will pri
 Common image formats such as JPG, PNG, and GIF are supported. Videos are not supported for obvious reasons. Up to 10 images can be included in one message. MMS messages can also contain text. 
 
 ### Contacts
-If "Send SMS Replies" is enabled in the settings, the first time a phone number sends a message to the TAG Machine, the following reply will be sent:
+If "Send SMS Replies" is enabled in the [settings](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings), the first time a phone number sends a message to the TAG Machine, the following reply will be sent:
 > "Thanks for messaging User's Fax Machine! Reply with your name within 24hrs to add it to the contact list."
 If the sender sends another non-empty message within 24 hours, their name will be added to the contact list. If 24 hours pass and they then send another message, the initial reply will be sent again requesting a name for the contacts list.
 
-If a user would like to change their name, they can send the following message: "_name" (without the quotes). The TAG Machine will reply requesting a new name, and if the sender sends another non-empty message within 24 hours, their name will be updated in the contact list. 
+If a user would like to change their name, they can send this exact message: "_name" (without the quotes). The TAG Machine will reply requesting a new name, and if the sender sends another non-empty message within 24 hours, their name will be updated in the contact list. 
 
 To import or export a contact list, go to the "Contacts" section of the web interface. 
 
@@ -63,9 +63,9 @@ To import or export a contact list, go to the "Contacts" section of the web inte
 If you send a picture message to the TAG Machine with the text "_photo" (without the quotes), the picture(s) will print without the heading or metadata, turning the TAG Machine into a rudimentary photo printer. 
 
 ### Web Interface
-You can select any address (ending in .local) for the web interface in the settings page. The default is http://tagmachine.local. This address will be printed at start-up. You can access the Web Interface in Message Mode (you must be connected to the same Wi-Fi Network), or from Setup Mode or Hotspot Mode (you must be connected to the TAG Machine's Hotspot Wi-Fi Network). Use any browser to access the web interface. The web interface has the following pages:
+You can select any address (ending in .local) for the web interface in the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings). The default is http://tagmachine.local. This address will be printed at start-up. You can access the Web Interface in Message Mode (you must be connected to the same Wi-Fi Network), or from Setup Mode or Hotspot Mode (you must be connected to the TAG Machine's Hotspot). Use any browser to access the web interface. The web interface has the following pages:
 - **Contacts:** Import or Export a contacts list here. Useful before uploading a new file system to the TAG Machine, to ensure you don't lose your existing contacts.
-- **Settings:** Change the TAG Machine's settings on this page, or import/export a settings file. See the Settings section for more detail. 
+- **Settings:** Change the TAG Machine's settings on this page, or import/export a settings file. See the [Settings](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) section for more detail. 
 - **Console:** A console that shows you in real-time what's happening under the hood of the TAG Machine. Will display everything printed to the printer, plus more. Useful for development as a serial monitor cannot be used at the same time as the thermal printer. 
 
 
@@ -78,6 +78,8 @@ You can select any address (ending in .local) for the web interface in the setti
 - *Lost WiFi Connection! Searching for Networks... <-- Press Button to Start Hotspot*: The TAG Machine was connected, but lost the connection. The TAG Machine requires a Wi-Fi connection to access the internet and will not be able to function. Press the button if you would like to start a local hotspot to connect to the TAG Machine directly and update the Wi-Fi Settings. The TAG Machine will attempt to reconnect to this or any other known network.
 
 - *Unable to connect to message server! Check your internet connection. Attempting to connect...*: The TAG Machine is connected to Wi-Fi, however it could not reach the message server. This could be due to a problem with your internet connection, or with the server. If the Bridge URL was left as the default in the settings, contact Silviu to make sure his server hasn't stopped working. If you are using your own server, check the configuration. 
+
+- If nothing is printing at all, access the [Web Interface](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#web-interface) and go to the Console. This should give you some idea of where the error lies. 
 
 ## Settings
 
@@ -128,3 +130,14 @@ You can select any address (ending in .local) for the web interface in the setti
 **Wifi Network Password 1-3:** The corresponding network password for a wi-fi network that the TAG Machine should attempt to connect to.
 
 
+## Firmware Updates
+
+Firmware updates can be done by following the same instructions as [initial setup](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-1---firmware). However, uploading the data (file system) again is not required unless there have been changes made to the "data" folder. If you do have to upload the data again, be sure to export your contacts and settings from the [Web Interface](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#web-interface) before doing so, and import them again after the upload. 
+
+### OTA (Over-The-Air) Updates
+
+Over-the-air updates are supported. If using PlatformIO, go to the platformio.ini file in the root folder of the repo and comment out the last 3 lines. If you have changed the default OTA Password in the settings, you must also update it here after "auth=" (without the quotes). If using a different dev environment, the OTA username is "tagmachine" and OTA password is set up in the TAG Machine Settings (default: 12345678).
+
+Please note that if performing an OTA update from Setup or Recovery mode, the OTA password will always be 12345678. 
+
+You must be connected to the same network as the TAG Machine in order to perform an OTA update, whether that's a common Wi-Fi network in Message mode or the TAG Machine Hotspot in Hotspot, Setup, or Recovery mode. 
