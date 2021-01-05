@@ -133,7 +133,7 @@ void process_message(String time, String from_number, String message, String med
         if(message == "_name"){
 
             //If the reply was successfully sent...
-            if(twilio.send_message(from_number, phone_number, "Please reply with a new name within 24hrs to add it to the phone book.")){
+            if(twilio.send_message(from_number, phone_number, "Please reply with a new name within 24hrs to add it to the contact list.")){
                 //Store the timestamp when the request was sent out
                 contacts.set(from_number, "_REQ" + time);
             }
@@ -158,7 +158,7 @@ void process_message(String time, String from_number, String message, String med
                 //Store the name in the phone book
                 contacts.set(from_number, message);
                 //Reply with a success message
-                twilio.send_message(from_number, phone_number, "Thanks " + message + ", your name has been added to the phone book. To change your name, reply with \"_name\".");
+                twilio.send_message(from_number, phone_number, "Thanks " + message + ", your name has been added to the contact list. To change your name, reply with \"_name\".");
         
                 //exit the function before printing
                 return;
@@ -173,7 +173,7 @@ void process_message(String time, String from_number, String message, String med
         //If request name is true...
         if(request_name){
             //Send a message asking the sender to reply with a name. If the reply is successful...
-            if(twilio.send_message(from_number, phone_number, "Thanks for messaging " + owner_name + "'s Fax Machine! Reply with your name within 24hrs to add it to the phone book.")){
+            if(twilio.send_message(from_number, phone_number, "Thanks for messaging " + owner_name + "'s Fax Machine! Reply with your name within 24hrs to add it to the contact list.")){
                 //Store the timestamp when the request was sent out
                 contacts.set(from_number, "_REQ" + time);
             }
@@ -366,7 +366,7 @@ void connected(){
 
     //Print the current Wi-Fi Network
     printer.print_status("WiFi Connected: " + WiFi_manager.get_SSID(), 0);
-    printer.print_status("Access web console at: http://" + String(local_URL) + ".local", 1);
+    printer.print_status("Access web interface at: http://" + String(local_URL) + ".local", 1);
 
     //Initialize the clock
     WTA_clock.begin();
@@ -409,7 +409,7 @@ void create_hotspot(){
     printer.print_status("Hotspot Started! ", 0);
     printer.print_status("Network: " + String(hotspot_SSID), 0);
     printer.print_status("Password: " + String(hotspot_password), 0);
-    printer.print_status("Access web console at: http://" + String(local_URL) + ".local", 1);
+    printer.print_status("Access Web Interface at: http://" + String(local_URL) + ".local", 1);
     printer.print_heading("<-- Press Button to Stop Hotspot", 3);
     //Initialize MDNS
     MDNS.begin(local_URL);
@@ -592,6 +592,7 @@ void setup() {
     MQTT_client.setServer(bridge_URL.c_str(), 1883);
     //Set callback for incoming message from MQTT
     MQTT_client.setCallback(new_message);
+    MQTT_client.setBufferSize(2048);
 
 
     

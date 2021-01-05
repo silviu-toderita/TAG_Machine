@@ -38,7 +38,7 @@
 
     {"id":"img_photos",
     "type":"bool",
-    "name":"Print Photos*",
+    "name":"Print Images*",
     "req":true, 
     "val":true}
 
