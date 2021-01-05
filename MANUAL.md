@@ -22,6 +22,7 @@ The TAG Machine connects to your local Wi-Fi network to access the internet, and
 This mode is indicated by a slowly flashing LED. This mode indicates that there is an error or missing field in the settings file and the TAG Machine cannot start. This is the expected mode when the TAG Machine is turned on for the first time. A hotspot is enabled:
 - Wi-Fi Name: tagmachine
 - Wi-Fi Password: 12345678
+
 The web interface is enabled to allow initial setup. Go to http://tagmachine.local from a browser. Navigate to the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) to enter initial settings or correct errors. 
 
 ### Recovery Mode
