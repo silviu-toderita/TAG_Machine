@@ -8,12 +8,12 @@ A table-top device that can receive text (SMS) and picture (MMS) messages at its
 
 ## Features
 
-- Prints text and (B&W Dithered) images!
-- Emojis are automatically converted to text description
+- Prints text and images!
+- Emojis are automatically converted to text descriptions
 - Links are automatically converted to QR codes
-- Optional Contacts list requests name from the sender directly
+- Contacts list requests name from the sender directly
 - Mobile-friendly web interface to easily update settings
-- Offline caching of messages
+- Offline message caching
 
 
 ## Build Your Own TAG Machine
