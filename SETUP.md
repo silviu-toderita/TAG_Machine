@@ -14,7 +14,7 @@
   * *Note that while both the NodeMCU and Thermal Printer support input voltages up to 9v, some models of printers are extremely sensitive to voltages slightly above 9.0v. Power Supplies with outputs of 9v may drift above 9v at times, causing the printer to freeze.*
 * DC Jack
 * Electrolytic Capacitor 220uF, 15v+
-* Case or Box (Simple DIY Case Design coming soon!)
+* 1N4001 Diode
 * Thermal Receipt Paper - 58mm wide, max thickness 40mm
 
 ### Optional - Configure Printer
@@ -31,7 +31,12 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 - Resistor value will depend on the LED used. 470-1k Ohm should work for most LEDs
 
 
-## Part 2 - Firmware
+## Part 2 - Case
+
+Coming soon...
+
+
+## Part 3 - Firmware
 
 *NOTE: Before uploading the firmware to the NodeMCU, ensure it's plugged into your computer via USB, and that it's not connected to the power supply or the printer.*
 
@@ -78,7 +83,7 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 
 
 
-## Part 3 - Server
+## Part 4 - Server
 
 ### Option 1: Use Silviu's Server (Easy)
 
@@ -119,7 +124,7 @@ This allows external connections to subscribe anonymously.
 
 11. Run TAG_Bridge.js using node, preferably using a process manager such as pm2 to ensure it restarts upon reboot. 
 
-## Part 4 - Twilio
+## Part 5 - Twilio
 
 1. Create a [Twilio](https://www.twilio.com/) account. New users can sign up for a trial without a credit card, which will give you a small amount of funds in your account for sending and receiving SMS and MMS messages. Sending messages is limited to verified numbers only, so it's recommended that you turn off "Send SMS Replies" in the TAG Machine settings later if you're planning on using a trial account. 
 
@@ -131,7 +136,7 @@ This allows external connections to subscribe anonymously.
 
 4. Under "A Message Comes In", select "Webhook" from the dropdown box. Next to that, type in "https://silviutoderita.com/twilio/" if using Silviu's server, or "http://youraddress.com/twilio" if using your own server. Next to that, make sure "HTTP Post" is selected as the request method. Press the "Save" button at the bottom when done. 
 
-## Part 5 - TAG Machine Settings
+## Part 6 - TAG Machine Settings
 
 1. Plug in your TAG Machine. The LED should start blinking rapidly almost immediately. This indicates that an incomplete settings file was detected, and it has automatically entered hotspot mode. 
 
