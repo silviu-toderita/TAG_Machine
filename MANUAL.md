@@ -63,6 +63,8 @@ To import or export a contact list, go to the "Contacts" section of the web inte
 If you send a picture message to the TAG Machine with the text "_photo" (without the quotes), the picture(s) will print without the heading or metadata, turning the TAG Machine into a rudimentary photo printer. 
 
 ### Web Interface
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/web_interface.png?raw=true" width="400">
+
 You can select any address (ending in .local) for the web interface in the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings). The default is http://tagmachine.local. This address will be printed at start-up. You can access the Web Interface in Message Mode (you must be connected to the same Wi-Fi Network), or from Setup Mode or Hotspot Mode (you must be connected to the TAG Machine's Hotspot). Use any browser to access the web interface. The web interface has the following pages:
 - **Contacts:** Import or Export a contacts list here. Useful before uploading a new file system to the TAG Machine, to ensure you don't lose your existing contacts.
 - **Settings:** Change the TAG Machine's settings on this page, or import/export a settings file. See the [Settings](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) section for more detail. 
