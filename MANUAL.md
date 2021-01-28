@@ -33,7 +33,7 @@ This mode is indicated by a rapidly flashing LED. To enter this mode, hold the b
 ### Message Mode
 The default mode, indicated by a printout of the TAG MACHINE logo, the wi-fi network it has connected to, the web interface URL, the date and time, and the current phone number. 
 
-![TAG Machine Example](https://raw.githubusercontent.com/silviu-toderita/TAG_Machine/master/docs/tag_printout.jpg)
+<img src="https://raw.githubusercontent.com/silviu-toderita/TAG_Machine/master/docs/tag_printout.jpg" width="250">
 
 In this mode, the LED is off. You can receive messages at the phone number, and they should print automaticalls. If the LED is off but nothing prints or an error message prints, see the Error Messages section.
 
