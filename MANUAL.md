@@ -2,7 +2,7 @@
 
 ## Initial Setup
 
-Follow the [setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md). Once finished [Part 5](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-5---tag-machine-settings), you should be on the settings page of the Tag Machine web interface. Read the [settings section](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) for more information on how to complete setup. 
+Follow the [setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md). Once finished [Part 6](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-6---tag-machine-settings), you should be on the settings page of the Tag Machine web interface. Read the [settings section](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) for more information on how to complete setup. 
 
 ## General Operation
 
@@ -137,7 +137,7 @@ To reset to factory settings and delete all user data, hold the button for at le
 
 ## Firmware Updates
 
-Firmware updates can be done by following the same instructions as [initial setup](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-1---firmware). However, uploading the data (file system) again is not required unless there have been changes made to the "data" folder. If you do have to upload the data again, be sure to export your contacts and settings from the [Web Interface](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#web-interface) before doing so, and import them again after the upload. 
+Firmware updates can be done by following the same instructions as [initial setup](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-3---firmware). However, uploading the data (file system) again is not required unless there have been changes made to the "data" folder. If you do have to upload the data again, be sure to export your contacts and settings from the [Web Interface](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#web-interface) before doing so, and import them again after the upload. 
 
 ### OTA (Over-The-Air) Updates
 
