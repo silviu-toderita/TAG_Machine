@@ -16,6 +16,7 @@
 * Electrolytic Capacitor 220uF, 15v+
 * 1N4001 Diode
 * Thermal Receipt Paper - 58mm wide, max thickness 40mm
+* [Case](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-2---case)
 
 ### Optional - Configure Printer
 
@@ -37,7 +38,7 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 
 The cardboard case design for the TAG Machine is available in the /case/ folder. It is designed to be laser-cut and laser-engraved from 1.3mm cardboard, and has been tested with [Ponoko](https://www.ponoko.com/), although other laser-cutting services will likely also work. The blue stroke is the cut path, and the red stroke is the engrave path. 
 
-<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/case_design.png?raw=true" width="600">
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/case_design.png?raw=true" width="500">
 
 To assemble the case, fold it at the short slots and insert the tabs into the long slots. The tabs will act as the feet of the case once it's put together. Please note that the design has been updated and may differ slightly from these photos. 
 
