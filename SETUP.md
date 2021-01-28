@@ -33,8 +33,13 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 
 ## Part 2 - Case
 
-Coming soon...
+![TAG Machine Picture](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/tag_pic.JPG?raw=true)
 
+The cardboard case design for the TAG Machine is available in the /case/ folder. It is designed to be laser-cut and laser-engraved from 1.3mm cardboard, and has been tested with [Ponoko](https://www.ponoko.com/), although other laser-cutting services will likely also work. The blue stroke is the cut path, and the red stroke is the engrave path. 
+
+![Case Design](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/case_design.png?raw=true)
+
+To assemble the case, fold it at the short slots and insert the tabs into the long slots. The tabs will act as the feet of the case once it's put together. Please note that the design has been updated and may differ slightly from these photos. 
 
 ## Part 3 - Firmware
 
