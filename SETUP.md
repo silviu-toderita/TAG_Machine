@@ -23,7 +23,7 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 
 ### Connections Schematic:
 
-![TAG Machine Schematic](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Schematic.png?raw=true)
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Schematic.png?raw=true" width="600">
 
 ### Connections Notes:
 - Thermal Printer wire colours can vary according to model, be sure to double-check label on the printer itself
@@ -33,13 +33,20 @@ You can optionally configure the printer to increase the Baud Rate form the defa
 
 ## Part 2 - Case
 
-![TAG Machine Picture](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/tag_pic.JPG?raw=true)
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/tag_pic.JPG?raw=true" width="600">
 
 The cardboard case design for the TAG Machine is available in the /case/ folder. It is designed to be laser-cut and laser-engraved from 1.3mm cardboard, and has been tested with [Ponoko](https://www.ponoko.com/), although other laser-cutting services will likely also work. The blue stroke is the cut path, and the red stroke is the engrave path. 
 
-![Case Design](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/case_design.png?raw=true)
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/case_design.png?raw=true" width="600">
 
 To assemble the case, fold it at the short slots and insert the tabs into the long slots. The tabs will act as the feet of the case once it's put together. Please note that the design has been updated and may differ slightly from these photos. 
+
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/case_2.JPG?raw=true" width="600">
+
+There are several holes in the design for a button, an LED, and a DC jack. Feel free to modify these as needed for your own use. The large cutout for the thermal printer module should fit any model of printer listed in the [shopping list](case_2.JPG). In addition to laser-cutting, you can always attempt to cut out the design by hand: It's recommended you enlarge the tabs and use glue if you decide to go this route. 
+
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/case_4.JPG?raw=true" width="600">
+
 
 ## Part 3 - Firmware
 
@@ -61,7 +68,7 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 
 4. Open the local folder with the Tag Machine repository in Visual Studio Code. 
 
-![Build & Upload PlatformIO](https://docs.platformio.org/en/latest/_images/platformio-ide-vscode-build-project.png)
+<img src="https://docs.platformio.org/en/latest/_images/platformio-ide-vscode-build-project.png" width="600">
 
 5. Press the Build button in the blue bar at the bottom of the Visual Studio Code window. You should see a green "SUCCESS" message at the bottom of the Terminal pane.
 
@@ -85,7 +92,6 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 5. Compile and upload to the board using USB. 
 
 6. Upload the contents of the data folder to the SPIFFS using USB. 
-
 
 
 ## Part 4 - Server
@@ -137,7 +143,7 @@ This allows external connections to subscribe anonymously.
 
 3. Navigate to the [Phone Numbers page](https://www.twilio.com/console/phone-numbers/incoming) of your [Twilio Console](https://www.twilio.com/console/), click on your number and scroll down to the "Messaging" section. Under "Configure With", select "Webhooks, TwiML Bins, Functions, Studio, or Proxy" from the dropdown box.
 
-![Twilio Screenshot](https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Twilio_Settings.png?raw=true)
+<img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/Twilio_Settings.png?raw=true" width="600">
 
 4. Under "A Message Comes In", select "Webhook" from the dropdown box. Next to that, type in "https://silviutoderita.com/twilio/" if using Silviu's server, or "http://youraddress.com/twilio" if using your own server. Next to that, make sure "HTTP Post" is selected as the request method. Press the "Save" button at the bottom when done. 
 
