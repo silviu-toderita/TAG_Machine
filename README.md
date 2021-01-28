@@ -16,7 +16,7 @@ A table-top device that can receive text (SMS) and picture (MMS) messages at its
 
 ## Build Your Own TAG Machine
 
-There is a [full setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md) available. Some electrical and embedded programming experience is required, though it should be doable for a beginner. While a server app is required to relay messages from Twilio to a TAG Machine, I have made my own server available for free to use (or you can set up your own easily). There is a [full parts list](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#part-2---hardware) available in the setup guide.
+There is a [full setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md) available. Some electrical and embedded programming experience is required, though it should be doable for a beginner. While a server app is required to relay messages from Twilio to a TAG Machine, I have made my own server available for free to use (or you can set up your own easily). There is a [full parts list](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#shopping-list) available in the setup guide.
 
 
 ## Dependencies
