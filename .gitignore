@@ -1,6 +1,6 @@
 .DS_Store
 /Resources/
-TAG_Machine.code-workspace
+*.code-workspace
 /.pio/
 /.vscode/
 platformio.ini
