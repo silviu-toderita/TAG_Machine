@@ -35,7 +35,7 @@ The default mode, indicated by a printout of the TAG MACHINE logo, the wi-fi net
 
 <img src="https://raw.githubusercontent.com/silviu-toderita/TAG_Machine/master/docs/tag_printout.jpg" width="250">
 
-In this mode, the LED is off. You can receive messages at the phone number, and they should print automaticalls. If the LED is off but nothing prints or an error message prints, see the Error Messages section.
+In this mode, the LED is off. You can receive messages at the phone number, and they should print automatically. If the LED is off but nothing prints or an error message prints, see the Error Messages section.
 
 ### Hotspot Mode
 If the TAG Machine starts up in Message Mode and a known Wi-Fi network is not found, it will give you the option of entering hotspot mode by pressing a button. If you choose to enter this mode, the hotspot network name and password you have chosen will be printed out again as a reminder, and a hotspot will be created. You can then connect to the hotspot and navigate to the URL of the web interface to update Wi-Fi Network details or any other settings. Press the button again at any time to return to Message Mode.
