@@ -7,49 +7,49 @@
     silviutoderita.com
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-#include "Arduino.h" //Arduino Library
-#include "Persistent_Storage.h" //Silviu's persistent storage library
+#include "Arduino.h" 
+#include "Persistent_Storage.h" 
 
 //Network Libraries
-#include "WiFi_Manager.h" //Silviu's WiFi Manager Library
-#include "ESP8266mDNS.h" //multicast DNS Library
-#include "ArduinoOTA.h" //Over-The-Air Update Library
-#include "Web_Interface.h" //Silviu's Web Interface Library
-#include "WTA_Clock.h" //Silviu's clock Library
+#include "WiFi_Manager.h" 
+#include "ESP8266mDNS.h"
+#include "ArduinoOTA.h" 
+#include "Web_Interface.h" 
+#include "WTA_Clock.h" 
 
 //Messaging Libraries
-#include "PubSubClient.h" //MQTT Client Library
-#include "Twilio.h" //Twilio Library
+#include "PubSubClient.h" 
+#include "Twilio.h" 
 
-#include "Thermal_Printer.h" //Silviu's Thermal Printer Library
-
-
-Persistent_Storage contacts("contacts"); //Storage object for the phone book
-WiFi_Manager WiFi_manager; //WiFi Manager object
-Web_Interface web_interface; //Web Interface Object
-WTA_Clock WTA_clock; //NTP object
-WiFiClient ESP_client; //Generic Client object for MQTT client
-PubSubClient MQTT_client(ESP_client); //MQTT client object
-Twilio twilio; //Twilio object
-Thermal_Printer printer; //Printer object
+#include "Thermal_Printer.h" 
 
 
-String last_message_ID; //Twilio ID of the last message received
-bool MQTT_connected = false; //Holds status of MQTT connection, true if MQTT has connected after Wi-Fi connection
-bool WiFi_connection_failed = false; //True if the Wi-Fi Connection has failed once, false if it has not failed since last successful connect
+Persistent_Storage contacts("contacts");
+WiFi_Manager WiFi_manager; 
+Web_Interface web_interface;
+WTA_Clock WTA_clock; 
+WiFiClient ESP_client; 
+PubSubClient MQTT_client(ESP_client); 
+Twilio twilio; 
+Thermal_Printer printer;
+
+
+String last_message_ID; // Twilio ID of the last message received
+bool MQTT_connected = false; // Holds status of MQTT connection, true if MQTT has connected after Wi-Fi connection
+bool WiFi_connection_failed = false; // True if the Wi-Fi Connection has failed once, false if it has not failed since last successful connect
 
 //Settings
-String phone_number; //Phone number of the Tag Machine
-String owner_name; //Name of device owner
-String bridge_URL; //URL of the MQTT broker
+String phone_number; // Phone number of the Tag Machine
+String owner_name; // Name of device owner
+String bridge_URL; // URL of the MQTT broker
 
-bool send_replies = true; //SMS replies are on/off default
-String local_URL = "tagmachine"; //Local URL to access web interface and OTA updates default
-String hotspot_SSID = "tagmachine"; //Hotspot SSID default
-String hotspot_password = "12345678"; //Hotspot Password default
-String OTA_password = "12345678"; //OTA password default
-uint8_t LED_pin = 4; //ESP pin for LED default
-uint8_t button_pin = 5; //ESP pin for button default
+bool send_replies = true; // SMS replies are on/off default
+String local_URL = "tagmachine"; // Local URL to access web interface and OTA updates default
+String hotspot_SSID = "tagmachine"; 
+String hotspot_password = "12345678"; 
+String OTA_password = "12345678"; 
+uint8_t LED_pin = 4; 
+uint8_t button_pin = 5;
 
 bool LED_on = false;
 
@@ -480,9 +480,9 @@ void offline(){
     printer.offline();
 }
 
-/*  init_basics: Initialize basic functions of the TAG Machine
+/*  init_OTA: Initialize basic functions of the TAG Machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void init_basics(){
+void init_OTA(){
     //Start the OTA updater using the device_password as the password
     ArduinoOTA.setHostname("tagmachine");
     ArduinoOTA.setPassword(OTA_password.c_str()); 
@@ -502,7 +502,7 @@ void bootloader(bool web_interface_on){
     uint16_t button_time = millis();
     bool button_pressed = true;
     //Initialize basic functions
-    init_basics();
+    init_OTA();
     //Create a hotspot
     WiFi_manager.create_hotspot(hotspot_SSID, hotspot_password);
     MDNS.begin(local_URL);
@@ -578,7 +578,7 @@ void setup() {
     //If the settings are valid, load them
     if(settings_valid){
         load_settings();
-        init_basics();
+        init_OTA();
         console("Settings loaded successfully!");
     //If the settings file is invalid, start the bootloader with the web interface running
     }else{
