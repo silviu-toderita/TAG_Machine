@@ -73,6 +73,7 @@ void connect(uint8_t ID){
     //Change status to WM_CONNECTING
     status = WM_CONNECTING;
     WiFi.disconnect(true);
+
     //Attempt to connect to network
     if(password_list[ID] == ""){
         WiFi.begin(SSID_list[ID]);
@@ -162,6 +163,7 @@ bool WiFi_Manager::create_hotspot(String hotspot_SSID, String hotspot_password){
     bool success = false;
     //Switch to Access Point mode
     WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(IPAddress(1,2,3,4),IPAddress(192,168,4,1),IPAddress(255,255,255,0));
     //Begin the hotspot
     if(hotspot_password == ""){
         if(WiFi.softAP(hotspot_SSID)) success = true;
@@ -232,5 +234,8 @@ bool WiFi_Manager::add_network(String SSID, String password){
   return true;
 }
 
+String WiFi_Manager::get_IP(){
+    return WiFi.localIP().toString();
+}
 
 

@@ -12,7 +12,6 @@
 
 //Network Libraries
 #include "WiFi_Manager.h" 
-#include "ESP8266mDNS.h"
 #include "ArduinoOTA.h" 
 #include "Web_Interface.h" 
 #include "WTA_Clock.h" 
@@ -44,7 +43,6 @@ String owner_name; // Name of device owner
 String bridge_URL; // URL of the MQTT broker
 
 bool send_replies = true; // SMS replies are on/off default
-String local_URL = "tagmachine"; // Local URL to access web interface and OTA updates default
 String hotspot_SSID = "tagmachine"; 
 String hotspot_password = "12345678"; 
 String OTA_password = "12345678"; 
@@ -367,13 +365,10 @@ void connected(){
 
     //Print the current Wi-Fi Network
     printer.print_status("WiFi Connected: " + WiFi_manager.get_SSID(), 0);
-    printer.print_status("Access web interface at: http://" + String(local_URL) + ".local", 1);
+    printer.print_status("Access web interface at: http://" + WiFi_manager.get_IP(), 1);
 
     //Initialize the clock
     WTA_clock.begin();
-
-    //Initialize MDNS
-    MDNS.begin(local_URL);
 
     //If the connection to the MQTT broker is unssuccessful, print an error and let the user know connection will continue to be attempted automatically
     if(!connect_to_MQTT()){
@@ -410,10 +405,8 @@ void create_hotspot(){
     printer.print_status("Hotspot Started! ", 0);
     printer.print_status("Network: " + String(hotspot_SSID), 0);
     printer.print_status("Password: " + String(hotspot_password), 0);
-    printer.print_status("Access Web Interface at: http://" + String(local_URL) + ".local", 1);
+    printer.print_status("Access Web Interface at: http://" + WiFi_manager.get_IP(), 1);
     printer.print_heading("<-- Press Button to Stop Hotspot", 3);
-    //Initialize MDNS
-    MDNS.begin(local_URL);
 }
 
 /*  load_settings: Load the settings from the settings file
@@ -428,12 +421,6 @@ void load_settings(){
     OTA_password = web_interface.load_setting("OTA_password");
     button_pin = web_interface.load_setting("button_pin").toInt();
     LED_pin = web_interface.load_setting("LED_pin").toInt();
-
-    //Load local_URL and filter out prefix and suffix
-    local_URL = web_interface.load_setting("local_URL");
-    if(local_URL.endsWith(".local")) local_URL = local_URL.substring(0,local_URL.length()-6);
-    if(local_URL.startsWith("http://")) local_URL = local_URL.substring(7);
-    if(local_URL.startsWith("https://")) local_URL = local_URL.substring(8);
 
     //Load send_replies and check if value is true or false
     String send_replies_string = web_interface.load_setting("send_replies");
@@ -505,7 +492,6 @@ void bootloader(bool web_interface_on){
     init_OTA();
     //Create a hotspot
     WiFi_manager.create_hotspot(hotspot_SSID, hotspot_password);
-    MDNS.begin(local_URL);
     //Loop forever
     while(true){
         if(web_interface_on){
@@ -537,8 +523,6 @@ void bootloader(bool web_interface_on){
             ESP.restart();
         }
 
-        //Run multicast DNS 
-        MDNS.update();
         //Run OTA updater service
         ArduinoOTA.handle(); 
 
@@ -573,7 +557,6 @@ void setup() {
     //Set the callback function for taking the printer offline before restarting due to settings update
     web_interface.set_callback(offline);
 
-    
 
     //If the settings are valid, load them
     if(settings_valid){
@@ -585,9 +568,6 @@ void setup() {
         console("ERROR: Settings is missing one or more required values! Navigate to the Settings page and complete all required settings.");
         bootloader(true);
     }
-
-
-
 
     //Initialize the printer with the callback function for printing to the console
     printer.begin(console_callback);
@@ -628,7 +608,6 @@ void loop() {
 
         case WM_CONNECTION_SUCCESS: //Connection to a Wi-Fi Network succeeded
         case WM_CONNECTED://Connected to a Wi-Fi Network
-            MDNS.update(); //Run mDNS service
             web_interface.handle(); //Update the web interface
             ArduinoOTA.handle(); //Run OTA updater service
             WTA_clock.handle(); //Update the clock
@@ -646,7 +625,6 @@ void loop() {
 
         //Currently running a hotspot
         case WM_HOTSPOT:
-            MDNS.update(); //Run mDNS service
             web_interface.handle(); //Update the web interface
             ArduinoOTA.handle(); //Run OTA updater service
             

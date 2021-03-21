@@ -53,13 +53,6 @@
     "val":9600, 
     "opt":[9600,19200, 28800,38400, 57600,76800,115200]},
 
-    {"id":"local_URL",
-    "type":"text",
-    "name":"Local URL*", 
-    "desc":"The URL for the web interface and Over-The-Air Updates. Must end in '.local'",
-    "req":true,
-    "val":"tagmachine.local"},
-
     {"id":"OTA_password",
     "type":"text",
     "name":"OTA Password", 

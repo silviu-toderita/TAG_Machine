@@ -34,6 +34,7 @@ class WiFi_Manager{
 
         String 
             get_SSID(),
-            get_password();
+            get_password(),
+            get_IP();
 
 };
