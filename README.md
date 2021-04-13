@@ -32,11 +32,6 @@ There is a [full setup guide](https://github.com/silviu-toderita/TAG_Machine/blo
 There is a [full manual available](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md) on how to use the TAG Machine. 
 
 
-## Authors
-
-**Silviu Toderita**
-
-
 ## License
 
 This project is licensed under the MIT License.
