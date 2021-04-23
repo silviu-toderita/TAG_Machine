@@ -16,7 +16,6 @@ const dither = require('floyd-steinberg'); //Dithering Library
 const fs = require('fs'); //File System Library
 const JIMP = require('jimp'); //Javascript Image Manipulation Program
 const storage = require('node-persist'); //Persistent Storage Library
-const twilio = require('twilio'); //Twilio library
 
 //Load settings from config file
 var config = JSON.parse(fs.readFileSync('config.json'));

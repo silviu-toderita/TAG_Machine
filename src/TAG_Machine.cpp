@@ -424,7 +424,7 @@ void load_settings(){
 
     //Load send_replies and check if value is true or false
     String send_replies_string = web_interface.load_setting("send_replies");
-    if(send_replies_string == "trueselected"){
+    if(send_replies_string == "true"){
         send_replies = true;
     }else{
         send_replies = false;
@@ -433,7 +433,7 @@ void load_settings(){
     //Load img_photos and check if value is true or false
     String img_photos_string = web_interface.load_setting("img_photos");
     bool img_photos;
-    if(img_photos_string == "trueselected"){
+    if(img_photos_string == "true"){
         img_photos = true;
     }else{
         img_photos = false;
@@ -494,22 +494,28 @@ void bootloader(bool web_interface_on){
     WiFi_manager.create_hotspot(hotspot_SSID, hotspot_password);
     //Loop forever
     while(true){
+        
         if(web_interface_on){
             //Flash the LED once a second
             if(LED_on && millis() % 1000 < 500){
-                digitalWrite(LED_pin, HIGH);
+                digitalWrite(LED_pin, LOW);
+                digitalWrite(D0, LOW);
                 LED_on = false;
             }else if(!LED_on && millis() % 1000 >= 500){
-                digitalWrite(LED_pin, LOW);
+                digitalWrite(LED_pin, HIGH);
+                digitalWrite(D0, HIGH);
                 LED_on = true;
             }
         }else{
             //Flash the LED 4 times a second
             if(LED_on && millis() % 250 < 125){
-                digitalWrite(LED_pin, HIGH);
-                LED_on = false;
-            }else if(!LED_on && millis() % 250 >= 125){
                 digitalWrite(LED_pin, LOW);
+                digitalWrite(D0, LOW);
+                LED_on = false;
+                
+            }else if(!LED_on && millis() % 250 >= 125){
+                digitalWrite(LED_pin, HIGH);
+                digitalWrite(D0, HIGH);
                 LED_on = true;
             }
         }
@@ -540,6 +546,8 @@ void bootloader(bool web_interface_on){
     ####  SETUP  ####
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void setup() {
+    pinMode(D0, OUTPUT);
+    digitalWrite(LED_pin, HIGH); 
     //Start the button to listen for bootloader mode
     pinMode(button_pin, INPUT_PULLUP);
     pinMode(LED_pin, OUTPUT);
@@ -589,6 +597,8 @@ void setup() {
     
     //Start the Wi-Fi
     begin_WiFi();
+
+    
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
