@@ -23,7 +23,7 @@ This mode is indicated by a slowly flashing LED. This mode indicates that there 
 - Wi-Fi Name: tagmachine
 - Wi-Fi Password: 12345678
 
-The [Web Interface](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#web-interface) is enabled to allow initial setup. Go to http://tagmachine.local from a browser. Navigate to the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) to enter initial settings or correct errors. 
+The [Web Interface](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#web-interface) is enabled to allow initial setup. Go to [http://1.2.3.4](http://1.2.3.4) from a browser. Navigate to the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) to enter initial settings or correct errors. 
 
 ### Recovery Mode
 This mode is indicated by a rapidly flashing LED. To enter this mode, hold the button while plugging in the TAG Machine. This mode only allows for over-the-air firmware updates with the password "123456778". A hotspot is enabled:
@@ -65,7 +65,7 @@ If you send a picture message to the TAG Machine with the text "_photo" (without
 ### Web Interface
 <img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/web_interface.png?raw=true" width="400">
 
-You can select any address (ending in .local) for the web interface in the [settings page](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings). The default is http://tagmachine.local. This address will be printed at start-up. You can access the Web Interface in Message Mode (you must be connected to the same Wi-Fi Network), or from Setup Mode or Hotspot Mode (you must be connected to the TAG Machine's Hotspot). Use any browser to access the web interface. The web interface has the following pages:
+In set-up and hotspot mode, you can access the web interface at [http://1.2.3.4](http://1.2.3.4). In message mode, the IP address will vary depending on your home network. This address will be printed at start-up. You must be connected to the same Wi-Fi network to access the web interface. Use any browser to access the web interface. The web interface has the following pages:
 - **Contacts:** Import or Export a contacts list here. Useful before uploading a new file system to the TAG Machine, to ensure you don't lose your existing contacts.
 - **Settings:** Change the TAG Machine's settings on this page, or import/export a settings file. See the [Settings](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md#settings) section for more detail. 
 - **Console:** A console that shows you in real-time what's happening under the hood of the TAG Machine. Will display everything printed to the printer, plus more. Useful for development as a serial monitor cannot be used at the same time as the thermal printer. 
@@ -104,8 +104,6 @@ You can select any address (ending in .local) for the web interface in the [sett
 ### Advanced Settings
 
 **Printer Baud Rate:** Select your thermal printer's baud rate. This can be found on a label on the printer, or by holding the printer's button while powering on. Most printers are 9600, while some are 19200. If you were able to [configure your printer for a higher baud rate](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#optional---configure-printer), be sure to also change it here. 
-
-**Local URL:** The URL for the printer's web interface. 
 
 **Password:** Password for over-the-air firmware updates.
 
