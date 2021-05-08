@@ -3,7 +3,7 @@
 <img src="https://github.com/silviu-toderita/TAG_Machine/blob/master/docs/tag_gif.gif?raw=true">
 </p>
 
-A table-top device that can receive text (SMS) and picture (MMS) messages at its own phone number. Built around an ESP8266 microcontroller. Written in C++ using the Arduino framework, using Twilio for SMS communication. Development has finished as of Jan 2021, however please submit any bugs using the Issues page. 
+A table-top device that receives text (SMS) and picture (MMS) messages at its own phone number and prints them on receipt paper. Built around an ESP8266 microcontroller. Written in C++ using the Arduino framework, using Twilio for SMS communication. Development has finished as of Jan 2021, however please submit any bugs using the Issues page. 
 
 
 ## Features
