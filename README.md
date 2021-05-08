@@ -21,15 +21,16 @@ A table-top device that can receive text (SMS) and picture (MMS) messages at its
 There is a [full setup guide](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md) available. Some electrical and embedded programming experience is required, though it should be doable for a beginner. While a server app is required to relay messages from Twilio to a TAG Machine, I have made my own server available for free to use (or you can set up your own easily). There is a [full parts list](https://github.com/silviu-toderita/TAG_Machine/blob/master/SETUP.md#shopping-list) available in the setup guide.
 
 
+## Using the TAG Machine
+
+There is a [full manual available](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md) on how to use the TAG Machine. 
+
+
 ## Dependencies
 
 * [knolleary/PubSubClient](https://github.com/knolleary/pubsubclient) 2.8
 * [bblanchon/ArduinoJson](https://github.com/bblanchon/ArduinoJson) 6.17.2
 * [links2004/WebSockets](https://github.com/Links2004/arduinoWebSockets) 2.3.2
-
-## Using the TAG Machine
-
-There is a [full manual available](https://github.com/silviu-toderita/TAG_Machine/blob/master/MANUAL.md) on how to use the TAG Machine. 
 
 
 ## License
