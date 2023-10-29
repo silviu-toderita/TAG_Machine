@@ -17,8 +17,6 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 #include "Thermal_Printer.h"
 
-static voidFuncPtrStr _print_callback;  // Callback function when printing
-
 /*  Thermal_Printer constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Thermal_Printer::Thermal_Printer(bool debugModeIn) {
@@ -38,10 +36,8 @@ void Thermal_Printer::config(uint32_t baud_rate_in, uint8_t DTR_pin_in, bool img
 }
 
 /*	begin: Starts the printer, should be called during setup before printing.
-        print_callback: Callback function to be called anytime printing happens,
-        that should accept a single String arg.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::begin(voidFuncPtrStr print_callback) {
+void Thermal_Printer::begin() {
     // Begin the serial connection to the printer after a 150ms delay to allow for OTA update serial garbage to finish
     delay(200);
     Serial.begin(baud_rate);
@@ -60,16 +56,6 @@ void Thermal_Printer::begin(voidFuncPtrStr print_callback) {
     // Set DTR pin and enable printer flow control
     pinMode(DTR_pin, INPUT_PULLUP);
     write_bytes(ASCII_GS, 'a', (1 << 5));
-
-    // Set the print callback
-    _print_callback = print_callback;
-}
-
-/*	begin: Starts the printer, should be called during setup before printing. No
-        printer callback defined.
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::begin() {
-    begin(NULL);
 }
 
 /*	set_printing_parameters
@@ -210,7 +196,6 @@ void Thermal_Printer::print_error(String text, uint8_t feed_amount) {
                 feed_amount: Amount to feed after line
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount) {
-    _print_callback("------------------------");
 
     wake();
     // Write full-width bitmap
@@ -232,9 +217,8 @@ void Thermal_Printer::print_line(uint8_t thickness, uint8_t feed_amount) {
                         byte, 1-bit bitmap with each byte being MSB. Width must be exactly 384 to
                         match printer width.
                 feed_amount: Amount to feed after image.
-        description: Text describing the photo to be sent back to printer callback
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount, String description) {
+void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount) {
     uint16_t height = file.read() * 256;  // First byte is height * 256
     height += file.read();                // Second byte is more height
     wake();
@@ -260,9 +244,6 @@ void Thermal_Printer::print_bitmap_file(File file, uint8_t feed_amount, String d
     }
 
     sleep();
-
-    // Print the description to the callback
-    _print_callback(description);
 
     feed(feed_amount);
 }
@@ -341,8 +322,6 @@ void Thermal_Printer::print_bitmap_http(String URL, uint8_t feed_amount) {
 
         // Close the connection
         http.end();
-
-        _print_callback("< IMAGE >");
 
         feed(feed_amount);
     } else {
@@ -439,7 +418,6 @@ void Thermal_Printer::write_bytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, ui
 void Thermal_Printer::output(String text) {
     wait();
     Serial.println(text);
-    _print_callback(text);
 }
 
 /*	(private) wrap: Wrap text.

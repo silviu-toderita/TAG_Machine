@@ -9,9 +9,6 @@
 #define ASCII_ESC  27
 #define ASCII_GS   29 
 
-//Define void callback function type with a single String arg
-typedef void (*voidFuncPtrStr)(const String input);
-
 class Thermal_Printer{
     public:
 
@@ -19,7 +16,6 @@ class Thermal_Printer{
 
         void    
             config(uint32_t, uint8_t, bool),
-            begin(voidFuncPtrStr),
             begin(),
             set_printing_parameters(uint8_t, uint8_t, uint8_t),
             offline(),
@@ -30,7 +26,7 @@ class Thermal_Printer{
             print_message(String, uint8_t),
             print_error(String, uint8_t),
             print_line(uint8_t, uint8_t),
-            print_bitmap_file(File, uint8_t, String),
+            print_bitmap_file(File, uint8_t),
             print_bitmap_http(String, uint8_t),
             feed(uint8_t);
 
