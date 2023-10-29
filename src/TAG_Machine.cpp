@@ -30,7 +30,7 @@ WTA_Clock WTA_clock;
 WiFiClient ESP_client; 
 PubSubClient MQTT_client(ESP_client); 
 Twilio twilio; 
-Thermal_Printer printer;
+Thermal_Printer printer(false);
 
 
 String last_message_ID; // Twilio ID of the last message received
@@ -76,21 +76,21 @@ void console_print(String input, bool printed){
     output += "\n";
 
     //Print the text
-    web_interface.console_print(output); 
+    // web_interface.console_print(output); 
 }
 
 /*  console: Print to the web console without printing to the printer
         input: Text to print
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void console(String input){
-  console_print(input, false);
+  // console_print(input, false);
 }
 
 /*  console_callback: Print to the web console after printing to the printer
         input: Text to print
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void console_callback(String input){
-  console_print(input, true);
+  // console_print(input, true);
 }
 
 /*  format_NA_phone_numbers: Format phone numbers as (XXX) XXX - XXXX if they are from North America
@@ -126,7 +126,6 @@ void process_message(String time, String from_number, String message, String med
 
     //If send_replies is on...
     if(send_replies){
-        
         //If the message is "_name", reply with a name update message
         if(message == "_name"){
 
@@ -184,7 +183,7 @@ void process_message(String time, String from_number, String message, String med
     //If photo mode is not on, print text
     if(!photo_mode){
         //Print the MESSAGE title
-        File file = SPIFFS.open("/message.dat", "r");
+        File file = LittleFS.open("/message.dat", "r");
         printer.print_bitmap_file(file, 1, "MESSAGE");
         file.close();
 
@@ -458,11 +457,11 @@ void load_settings(){
     
 }
 
-/*  offline: Take SPIFFS and printer offline ahead of restart, to avoid file system corruption and garbage printer output
+/*  offline: Take LittleFS and printer offline ahead of restart, to avoid file system corruption and garbage printer output
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void offline(){
-    //Disable SPIFFS
-    SPIFFS.end();
+    //Disable LittleFS
+    LittleFS.end();
     //Disable the printer so there is no garbage output
     printer.offline();
 }
@@ -523,8 +522,8 @@ void bootloader(bool web_interface_on){
         // If the button continues to be held for 5 seconds continuously, do a factory reset
         if(button_pressed && digitalRead(button_pin)) button_pressed = false;
         if(button_pressed && millis() > button_time + 5000){
-            SPIFFS.remove("/settings.txt");
-            SPIFFS.remove("/contacts.txt");
+            LittleFS.remove("/settings.txt");
+            LittleFS.remove("/contacts.txt");
             offline();
             ESP.restart();
         }
@@ -584,21 +583,18 @@ void setup() {
     WiFi_manager.set_callbacks(connected, disconnected, connection_failed);
 
     //Print the title
-    File file = SPIFFS.open("/logo.dat", "r");
+    File file = LittleFS.open("/logo.dat", "r");
     printer.print_bitmap_file(file, 2, "TAG MACHINE");
     file.close();
 
     MQTT_client.setServer(bridge_URL.c_str(), 1883);
     //Set callback for incoming message from MQTT
     MQTT_client.setCallback(new_message);
-    MQTT_client.setBufferSize(2048);
+    MQTT_client.setBufferSize(1024);
 
-
-    
     //Start the Wi-Fi
     begin_WiFi();
 
-    
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

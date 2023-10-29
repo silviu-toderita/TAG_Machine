@@ -18,7 +18,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Persistent_Storage::Persistent_Storage(String name){
     path = "/" + name + ".txt";
-    SPIFFS.begin();
+    LittleFS.begin();
 }
 
 /*  put: Add a new key:value pair to storage, or modify the value of an existing key
@@ -31,7 +31,7 @@ bool Persistent_Storage::set(String key, String value){
     if(key == "") return false;
 
     //Open the file for reading
-    File file = SPIFFS.open(path, "r");
+    File file = LittleFS.open(path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2 + 256);
 
@@ -45,7 +45,7 @@ bool Persistent_Storage::set(String key, String value){
     doc[key] = value;
 
     //Open the file for writing
-    file = SPIFFS.open(path, "w");
+    file = LittleFS.open(path, "w");
 
     bool status = false;
     //Export the JSON to the file
@@ -63,7 +63,7 @@ bool Persistent_Storage::set(String key, String value){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String Persistent_Storage::get(String key){
     //Open the file for reading
-    File file = SPIFFS.open(path, "r");
+    File file = LittleFS.open(path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
 
@@ -91,7 +91,7 @@ bool Persistent_Storage::remove(String key){
     if(key == "") return false;
 
     //Open the file for reading
-    File file = SPIFFS.open(path, "r");
+    File file = LittleFS.open(path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
 
@@ -105,7 +105,7 @@ bool Persistent_Storage::remove(String key){
     doc.remove(key);
 
     //Open the file for writing
-    file = SPIFFS.open(path, "w");
+    file = LittleFS.open(path, "w");
 
     bool status = false;
     //Export the JSON to the file

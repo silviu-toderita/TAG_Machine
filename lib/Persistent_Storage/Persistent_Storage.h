@@ -1,5 +1,5 @@
 #include "Arduino.h"
-#include "FS.h" //SPI Flash File System (SPIFFS) Library
+#include "LittleFS.h"
 #include "ArduinoJson.h" //Arduino JavaScript Object Notation Library
 
 class Persistent_Storage{

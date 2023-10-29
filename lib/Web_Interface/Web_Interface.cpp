@@ -5,10 +5,10 @@
 
     To use, initialize a Web_Interface setting and call handle() every loop or as
     often as possible. Call console_print() to output a line to the console. Place
-    files for server in /www/ folder in SPIFFS. 
+    files for server in /www/ folder in LittleFS. 
 
     To use the settings function, place a settings.txt file in the root 
-    of the SPIFFS. Settings must be in the following JSON format ("advanced" is
+    of the LittleFS. Settings must be in the following JSON format ("advanced" is
     an optional category, while "basic" and "wifi" are required and can have any
     number of settings):
     {"basic":[
@@ -49,11 +49,11 @@
 #include "Web_Interface.h"
 
 ESP8266WebServer server(80); //Create a web server listening on port 80
-WebSocketsServer websockets_server = WebSocketsServer(81); //Create a websockets server listening on port 81
+// WebSocketsServer websockets_server = WebSocketsServer(81); //Create a websockets server listening on port 81
 
 static void_function_pointer _offline; //Callback function when connected
 
-int8_t websockets_client = -1; //Current websockets client number connected to (-1 is none)
+// int8_t websockets_client = -1; //Current websockets client number connected to (-1 is none)
 
 const String settings_path = "/settings.txt"; //Path to settings file
 
@@ -61,10 +61,9 @@ File upload_file; //Holds file currently uploading
 
 //settings
 const bool settings_page = true;
-const bool console_page = true;
-const uint8_t number_custom_pages = 1;
-const String custom_page_path[number_custom_pages] = "/contacts/";
-const String custom_page_name[number_custom_pages] = "Contacts";
+const bool console_page = false;
+const String custom_page_path = "/contacts/";
+const String custom_page_name = "Contacts";
 
 /*  (private) get_content_type: Returns the HTTP content type based on the extension
         filename: 
@@ -87,7 +86,7 @@ String get_content_type(String filename){
     return "text/plain"; //If none of the above, assume file is plain text
 }
 
-/*  (private)handle_file_read: Read a file from SPIFFS and serve it when requested.
+/*  (private)handle_file_read: Read a file from LittleFS and serve it when requested.
         path: The requested URI
     RETURNS true if the file exists, false if it does not exist
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -107,8 +106,8 @@ bool handle_file_read(String path){
     } 
 
     //If the compressed file exists, stream it to the client
-    if(SPIFFS.exists(path + ".gz")){
-        File file = SPIFFS.open(path + ".gz", "r"); 
+    if(LittleFS.exists(path + ".gz")){
+        File file = LittleFS.open(path + ".gz", "r"); 
         if(cache) server.sendHeader("Cache-Control", "max-age=2592000");          
         server.streamFile(file, content_type);
         file.close();                                    
@@ -116,8 +115,8 @@ bool handle_file_read(String path){
     }
 
     //If the file exists, stream it to the client
-    if(SPIFFS.exists(path)){
-        File file = SPIFFS.open(path, "r");
+    if(LittleFS.exists(path)){
+        File file = LittleFS.open(path, "r");
         if(cache) server.sendHeader("Cache-Control", "max-age=2592000"); 
         server.streamFile(file, content_type);
         file.close();                                    
@@ -125,8 +124,8 @@ bool handle_file_read(String path){
     }
 
     //If the file exists in the root folder instead of the /www/ folder, stream it to the client (this is for debugging non-server files)
-    if(SPIFFS.exists(path.substring(4))){
-        File file = SPIFFS.open(path.substring(4), "r");                
+    if(LittleFS.exists(path.substring(4))){
+        File file = LittleFS.open(path.substring(4), "r");                
         server.streamFile(file, content_type);
         file.close();                                    
         return true;
@@ -141,7 +140,7 @@ bool handle_file_read(String path){
         payload: message payload
         length: message length
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t length) { // When a WebSocket message is received
+/* void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t length) { // When a WebSocket message is received
 
     //Take different action based on the type of event
     switch (type) {
@@ -157,9 +156,9 @@ void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
             websockets_client = num;
 
             //If the console file exists...
-            if(SPIFFS.exists("/www/console.txt")){
+            if(LittleFS.exists("/www/console.txt")){
                 //Open the console.txt file in read mode and send it to the client
-                File console = SPIFFS.open("/www/console.txt", "r");
+                File console = LittleFS.open("/www/console.txt", "r");
                 String console_text = console.readString();
                 websockets_server.sendTXT(num, console_text);
                 //Close the file
@@ -173,7 +172,7 @@ void websockets_event(uint8_t num, WStype_t type, uint8_t * payload, size_t leng
             break;
     }
 
-}
+} */
 
 /*  (private)text_input_HTML: Create the html for a text form input
         id: setting id
@@ -300,7 +299,7 @@ String input_html(JsonArray settings){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void handle_settings_get(){
     //Open the settings file
-    File file = SPIFFS.open(settings_path, "r");
+    File file = LittleFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
 
@@ -372,7 +371,7 @@ void handle_settings_post(){
     server.send(200);
 
     //Open the file for reading
-    File file = SPIFFS.open(settings_path, "r");
+    File file = LittleFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
 
@@ -412,7 +411,7 @@ void handle_settings_post(){
 
 
     //Open the file for writing
-    file = SPIFFS.open(settings_path, "w");
+    file = LittleFS.open(settings_path, "w");
     //Encode the JSON in the file
     serializeJson(doc, file);
     //Close the file
@@ -435,11 +434,9 @@ void handle_nav(){
     response +=     "<div class=\"collapse navbar-collapse\" id=\"navbarCollapse\">";
     response +=         "<ul class=\"navbar-nav\">";
 
-    for(int i = 0; i < number_custom_pages; i++){
-        response +=         "<li class=\"nav-item\">";
-        response +=             "<a class=\"nav-link\" href=\"" + custom_page_path[i] + "\">" + custom_page_name[i] + "</a>";
-        response +=         "</li>";
-    }
+    response +=         "<li class=\"nav-item\">";
+    response +=             "<a class=\"nav-link\" href=\"" + custom_page_path + "\">" + custom_page_name + "</a>";
+    response +=         "</li>";
 
     if(settings_page){
         response +=         "<li class=\"nav-item\">";
@@ -463,8 +460,7 @@ void handle_nav(){
 /*  Web_Interface Constructor (with defaults)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 Web_Interface::Web_Interface(){
-    SPIFFS.begin();
-    SPIFFS.gc();
+    LittleFS.begin();
 }
 
 /*  set_callback: Set the callback function to take tag machine offline safely before restarting
@@ -480,9 +476,9 @@ void Web_Interface::set_callback(void_function_pointer offline){
 bool check_settings_file(){
 
     // If the settings file does not exist, copy it from the default settings file
-    if(!SPIFFS.exists(settings_path)){
-        File settings_def = SPIFFS.open("/settings_def.txt", "r");
-        File settings = SPIFFS.open(settings_path, "w");
+    if(!LittleFS.exists(settings_path)){
+        File settings_def = LittleFS.open("/settings_def.txt", "r");
+        File settings = LittleFS.open(settings_path, "w");
         while(settings_def.available()){
             settings.write(settings_def.read());
         }
@@ -491,7 +487,7 @@ bool check_settings_file(){
     }
 
     //Open the file
-    File file = SPIFFS.open(settings_path, "r");
+    File file = LittleFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
 
@@ -541,7 +537,7 @@ bool check_settings_file(){
     return true;
 }
 
-/*  (private)handle_file_upload: Processes file upload and saves it to SPIFFS
+/*  (private)handle_file_upload: Processes file upload and saves it to LittleFS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void handle_file_upload(){
     //Holds current upload
@@ -553,7 +549,7 @@ void handle_file_upload(){
         //Add a / prefix if it's not part of the filename already
         if(!filename.startsWith("/")) filename = "/" + filename;
         //Open the file for writing
-        upload_file = SPIFFS.open(filename, "w");   
+        upload_file = LittleFS.open(filename, "w");   
     //If the upload is in progress, write the buffer to the file        
     }else if(upload.status == UPLOAD_FILE_WRITE && upload_file){
         upload_file.write(upload.buf, upload.currentSize);
@@ -569,8 +565,8 @@ void handle_file_upload(){
         } 
     }
 
-    String upload_status = String(upload.status);
-    websockets_server.sendTXT(websockets_client, upload_status);
+    // String upload_status = String(upload.status);
+    // websockets_server.sendTXT(websockets_client, upload_status);
 }
 
 /*  begin: Start the web interface
@@ -595,13 +591,13 @@ bool Web_Interface::begin(){
 
     server.begin(); //Start the server
 
-    if(console_page){
+    /* if(console_page){
         //If a websockets message comes in, call this function
         websockets_server.onEvent(websockets_event);
         websockets_server.begin(); //Start the websockets server
         //If a console.txt file exists, delete it to start with a clean console upon init
-        if(SPIFFS.exists("/www/console.txt")) SPIFFS.remove("/www/console.txt"); 
-    } 
+        if(LittleFS.exists("/www/console.txt")) LittleFS.remove("/www/console.txt"); 
+    } */
 
     //If the settings file is good, return true. Otherwise, return false. 
     if(check_settings_file() || !settings_page){
@@ -614,13 +610,13 @@ bool Web_Interface::begin(){
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 void Web_Interface::handle(){
     server.handleClient();
-    if(console_page) websockets_server.loop();
+    // if(console_page) websockets_server.loop();
 }
 
 /*  console_print: Print to the web console
         output: Text to print
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-void Web_Interface::console_print(String output){
+/* void Web_Interface::console_print(String output){
     if(console_page){
         //If there is an active websockets connection, send the text to the client
         if(websockets_client != -1){
@@ -628,13 +624,13 @@ void Web_Interface::console_print(String output){
         }
 
         //Open/create the console.txt file in append mode
-        File console = SPIFFS.open("/www/console.txt", "a");
+        File console = LittleFS.open("/www/console.txt", "a");
 
         //If the console file is over 10kb, delete it and create a new one. 
         if(console.size() > 10000){
             console.close();
-            SPIFFS.remove("/www/console.txt");
-            console = SPIFFS.open("/www/console.txt", "w");
+            LittleFS.remove("/www/console.txt");
+            console = LittleFS.open("/www/console.txt", "w");
         }
 
         //output the current string to the end of the file
@@ -642,14 +638,14 @@ void Web_Interface::console_print(String output){
         //Close the file
         console.close();
     }
-}
+} */
 
 /*  load_setting: 
     RETURNS the specified setting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 String Web_Interface::load_setting(String setting){
     //Open the file for reading
-    File file = SPIFFS.open(settings_path, "r");
+    File file = LittleFS.open(settings_path, "r");
     //Set aside enough memory for a JSON document
     DynamicJsonDocument doc(file.size() * 2);
 

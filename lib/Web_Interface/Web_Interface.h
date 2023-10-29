@@ -1,7 +1,7 @@
 #include "Arduino.h"
 #include "ESP8266WebServer.h" //Web Server Library
-#include "WebSocketsServer.h" //WebSockets Server Library
-#include "fs.h" //SPIFFS Library
+// #include "WebSocketsServer.h" //WebSockets Server Library
+#include "LittleFS.h" //LittleFS Library
 #include "ArduinoJson.h" //Arduino JavaScript Object Notation Library
 
 //Callback function type (no args)
@@ -14,8 +14,8 @@ class Web_Interface{
     
         void 
             set_callback(void_function_pointer offline),
-            handle(),
-            console_print(String output);
+            handle();
+            // console_print(String output);
 
         bool
             begin();

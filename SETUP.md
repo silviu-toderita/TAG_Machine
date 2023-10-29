@@ -83,7 +83,7 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
 
 2. Configure your preferred development environment for the NodeMCU or an ESP8266 with 4MB of flash memory. 
 
-3. Configure at least 1MB of flash memory for file storage using SPIFFS. 
+3. Configure at least 1MB of flash memory for file storage using LittleFS. 
 
 4. Install the following dependencies:
 	* [knolleary/PubSubClient](https://github.com/knolleary/pubsubclient) 2.8
@@ -92,7 +92,7 @@ If you have issues with getting your computer to recognize your NodeMCU, make su
   
 5. Compile and upload to the board using USB. 
 
-6. Upload the contents of the data folder to the SPIFFS using USB. 
+6. Upload the contents of the data folder to the LittleFS using USB. 
 
 
 ## Part 4 - Server

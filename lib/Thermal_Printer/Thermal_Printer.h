@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "FS.h"
+#include "WiFiClient.h"
 #include "ESP8266HTTPClient.h"
 
 //Define control characters
@@ -14,7 +15,7 @@ typedef void (*voidFuncPtrStr)(const String input);
 class Thermal_Printer{
     public:
 
-        Thermal_Printer();
+        Thermal_Printer(bool);
 
         void    
             config(uint32_t, uint8_t, bool),
@@ -56,10 +57,14 @@ class Thermal_Printer{
         String  
             wrap(String, uint8_t);
 
+        WiFiClient wifiClient; 
+
         uint32_t baud_rate = 0; //Baud rate of printer
         uint8_t DTR_pin = 0; //ESP8266 pin to use to detect DTR
 
         uint8_t printMode = 0; //printMode byte holds inverse, double height, double width, and bold font status
         
-        bool img_web; // Print images from web
+        bool 
+            debugMode,
+            img_web; // Print images from web
 };
